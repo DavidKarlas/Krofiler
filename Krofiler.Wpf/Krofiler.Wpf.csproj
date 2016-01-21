@@ -43,15 +43,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Krofiler\Krofiler.csproj">
-      <Project>{E1A8DAC5-8DA4-484E-94D3-0F5CA97B430C}</Project>
-      <Name>Krofiler</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <Import Project="..\Krofiler\Krofiler.projitems" Label="Shared" Condition="Exists('..\Krofiler\Krofiler.projitems')" />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
     <None Include="packages.config" />

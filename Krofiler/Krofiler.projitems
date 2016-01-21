@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{4B8E6222-A207-44B9-A240-ECDEC3C8A6F3}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Krofiler</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)MainForm.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\Buffer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\Event.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\EventVisitor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\FieldInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\Graph.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\Header.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\HeapShotEventArgs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\HeapSnapshot.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\IProgressListener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\LogBuffer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\LogFileReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\ObjectInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\ObjectMapFileReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\ObjectReference.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\ReferenceNode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\TypeInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader\Util.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LargeList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ProfilerRunner.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)LogReader\" />
+  </ItemGroup>
+</Project>

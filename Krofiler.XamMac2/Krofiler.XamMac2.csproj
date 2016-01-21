@@ -37,7 +37,6 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
-    <LinkMode>SdkOnly</LinkMode>
     <Profiling>false</Profiling>
     <UseRefCounting>true</UseRefCounting>
     <UseSGen>true</UseSGen>
@@ -59,12 +58,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Krofiler\Krofiler.csproj">
-      <Project>{E1A8DAC5-8DA4-484E-94D3-0F5CA97B430C}</Project>
-      <Name>Krofiler</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Resources\" />
   </ItemGroup>
   <ItemGroup>
@@ -75,5 +68,6 @@
     <None Include="Info.plist" />
     <None Include="packages.config" />
   </ItemGroup>
+  <Import Project="..\Krofiler\Krofiler.projitems" Label="Shared" Condition="Exists('..\Krofiler\Krofiler.projitems')" />
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\Mac\Xamarin.Mac.CSharp.targets" />
 </Project>
