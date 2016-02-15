@@ -42,41 +42,41 @@ namespace MonoDevelop.Profiler
 		public readonly long PtrBase; // base value for pointers
 		public readonly long ObjBase; // base value for object addresses
 		public readonly long ThreadId; // system-specific thread ID (pthread_t for example)
-		public readonly long MethodBase; // base value for MonoMethod pointers
+		public long MethodBase; // base value for MonoMethod pointers
 
-		BufferHeader (LogFileReader reader)
+		BufferHeader(LogFileReader reader)
 		{
-			BufId = reader.ReadInt32 ();
+			BufId = reader.ReadInt32();
 			if (BufId != BUF_ID)
-				throw new IOException (string.Format ("Incorrect buffer id: 0x{0:X}", BufId));
-			Length = reader.ReadInt32 ();
-			TimeBase = reader.ReadUInt64 ();
-			PtrBase = reader.ReadInt64 ();
-			ObjBase = reader.ReadInt64 ();
-			ThreadId = reader.ReadInt64 ();
-			MethodBase = reader.ReadInt64 ();
+				throw new IOException(string.Format("Incorrect buffer id: 0x{0:X}", BufId));
+			Length = reader.ReadInt32();
+			TimeBase = reader.ReadUInt64();
+			PtrBase = reader.ReadInt64();
+			ObjBase = reader.ReadInt64();
+			ThreadId = reader.ReadInt64();
+			MethodBase = reader.ReadInt64();
 		}
-		
-		public static BufferHeader Read (LogFileReader reader)
+
+		public static BufferHeader Read(LogFileReader reader)
 		{
 			BufferHeader result;
 			long position = reader.Position;
-			
-			if (!reader.LoadData (48))
+
+			if (!reader.LoadData(48))
 				return null;
-			
+
 			try {
-				result = new BufferHeader (reader);
+				result = new BufferHeader(reader);
 			} catch {
-				Console.WriteLine ("Exception reading buffer at position {0}", position);
+				Console.WriteLine("Exception reading buffer at position {0}", position);
 				throw;
 			}
-			
-			if (!reader.LoadData (result.Length)) {
+
+			if (!reader.LoadData(result.Length)) {
 				reader.Position = position; // rollback
 				return null;
 			}
-			
+
 			return result;
 		}
 	}
@@ -84,25 +84,25 @@ namespace MonoDevelop.Profiler
 	public class Buffer
 	{
 		public readonly BufferHeader Header;
-		public readonly List<Event> Events = new List<Event> ();
-		
-		Buffer (LogFileReader reader)
+		public readonly List<Event> Events = new List<Event>();
+
+		Buffer(LogFileReader reader)
 		{
-			Header = BufferHeader.Read (reader);
+			Header = BufferHeader.Read(reader);
 			var endPos = reader.Position + Header.Length;
 			while (reader.Position < endPos) {
-				Events.Add (Event.Read (reader));
+				Events.Add(Event.Read(reader));
 			}
 		}
-		
-		public void RunVisitor (EventVisitor visitor)
+
+		public void RunVisitor(EventVisitor visitor)
 		{
-			Events.ForEach (e => e.Accept (visitor));
+			Events.ForEach(e => e.Accept(visitor));
 		}
-		
-		public static Buffer Read (LogFileReader reader)
+
+		public static Buffer Read(LogFileReader reader)
 		{
-			return new Buffer (reader);
+			return new Buffer(reader);
 		}
 	}
 }

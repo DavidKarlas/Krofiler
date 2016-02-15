@@ -1,0 +1,13 @@
+﻿using System;
+namespace Krofiler
+{
+	public class KrofilerSession
+	{
+		/// <summary>
+		/// True means we are connected, data is being generated, we can request heapshots
+		/// False means we are loading from old file
+		/// </summary>
+		public bool Live { get; private set; }
+	}
+}
+

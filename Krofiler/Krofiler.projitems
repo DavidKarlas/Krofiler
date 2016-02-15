@@ -9,7 +9,6 @@
     <Import_RootNamespace>Krofiler</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)MainForm.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\Buffer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\Event.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\EventVisitor.cs" />
@@ -27,10 +26,29 @@
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\ReferenceNode.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\TypeInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader\Util.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)LargeList.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)ProfilerRunner.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\GcMove.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\Heapshot.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\HeapshotPage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\Helper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\HomePage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Create.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Parsing.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.ProfileeManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.RandomStuff.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Utils.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\MainForm.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\LargeList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ObjectDetailsPanel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\ProfilerRunner.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ProfilingInProgressPage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\RetentionGraph.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\StackFrame.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\ObjectInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)LogReader\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Logic\" />
+    <Folder Include="$(MSBuildThisFileDirectory)UI\" />
   </ItemGroup>
 </Project>

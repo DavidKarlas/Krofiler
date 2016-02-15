@@ -74,10 +74,7 @@ namespace MonoDevelop.Profiler
 		/// <value>
 		/// Nanoseconds since last timing.
 		/// </value>
-		public ulong TimeDiff {
-			get;
-			protected set;
-		}
+		public ulong Time;
 
 		public const byte TYPE_GC_EVENT = 1 << 4;
 		public const byte TYPE_GC_RESIZE = 2 << 4;
@@ -143,16 +140,16 @@ namespace MonoDevelop.Profiler
 	public class AllocEvent : Event
 	{
 		public const byte TYPE_ALLOC_BT = 1 << 4;
-		public readonly long Ptr; // class as a byte difference from ptr_base
+		//public readonly long Ptr; // class as a byte difference from ptr_base
 		public readonly long Obj; // object address as a byte difference from obj_base
 		public readonly ulong Size; // size of the object in the heap
 		public readonly long[] Backtrace;
 
 		AllocEvent(LogFileReader reader, byte extendedInfo)
 		{
-			TimeDiff = reader.ReadULeb128();
-			Ptr = reader.ReadSLeb128();
-			Obj = reader.ReadSLeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
+			reader.ReadSLeb128();
+			Obj = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
 			Size = reader.ReadULeb128();
 			if ((extendedInfo & TYPE_ALLOC_BT) != 0) {
 				reader.ReadULeb128();
@@ -184,7 +181,7 @@ namespace MonoDevelop.Profiler
 
 		ResizeGcEvent(LogFileReader reader)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			HeapSize = reader.ReadULeb128();
 		}
 
@@ -220,7 +217,7 @@ namespace MonoDevelop.Profiler
 
 		GcEvent(LogFileReader reader)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			EventType = (GcEventType)reader.ReadULeb128();
 			Generation = reader.ReadULeb128();
 		}
@@ -242,11 +239,11 @@ namespace MonoDevelop.Profiler
 
 		MoveGcEvent(LogFileReader reader)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			ulong num = reader.ReadULeb128();
 			ObjAddr = new long[num];
 			for (ulong i = 0; i < num; i++) {
-				ObjAddr[i] = reader.ReadSLeb128();
+				ObjAddr[i] = reader.ReadSLeb128() + reader.BufferHeader.ObjBase;
 			}
 		}
 
@@ -269,7 +266,7 @@ namespace MonoDevelop.Profiler
 
 		HandleCreatedGcEvent(LogFileReader reader, byte exinfo)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			HandleType = reader.ReadULeb128();
 			Handle = reader.ReadULeb128();
 			ObjAddr = reader.ReadSLeb128();
@@ -295,7 +292,7 @@ namespace MonoDevelop.Profiler
 
 		HandleDestroyedGcEvent(LogFileReader reader, byte exinfo)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			HandleType = reader.ReadULeb128();
 			Handle = reader.ReadULeb128();
 			if (exinfo == TYPE_GC_HANDLE_DESTROYED_BT)
@@ -337,9 +334,9 @@ namespace MonoDevelop.Profiler
 
 		MetadataEvent(LogFileReader reader, byte extendedInfo)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			MType = (MetaDataType)reader.ReadByte();
-			Pointer = reader.ReadSLeb128();
+			Pointer = reader.BufferHeader.PtrBase + reader.ReadSLeb128();
 			switch (MType) {
 				case MetaDataType.Class:
 					Image = reader.ReadSLeb128();
@@ -405,8 +402,9 @@ namespace MonoDevelop.Profiler
 
 		MethodEvent(LogFileReader reader, byte exinfo)
 		{
-			TimeDiff = reader.ReadULeb128();
-			Method = reader.ReadSLeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
+			reader.BufferHeader.MethodBase += reader.ReadSLeb128();
+			Method = reader.BufferHeader.MethodBase;
 			Type = (MethodType)exinfo;
 			if (Type == MethodType.Jit) {
 				CodeAddress = reader.ReadSLeb128();
@@ -444,7 +442,7 @@ namespace MonoDevelop.Profiler
 
 		ExceptionEvent(LogFileReader reader, byte exinfo)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			byte subtype = (byte)(exinfo & ~TYPE_EXCEPTION_BT);
 			if (subtype == TYPE_CLAUSE) {
 				ClauseType = reader.ReadULeb128();
@@ -482,7 +480,7 @@ namespace MonoDevelop.Profiler
 
 		MonitiorEvent(LogFileReader reader, byte exinfo)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			Object = reader.ReadSLeb128();
 			byte ev = (byte)((exinfo >> 4) & 0x3);
 			if (ev == MONO_PROFILER_MONITOR_CONTENTION && (exinfo & TYPE_MONITOR_BT) == TYPE_MONITOR_BT) {
@@ -513,7 +511,7 @@ namespace MonoDevelop.Profiler
 		public readonly long Object; // the object as a difference from obj_base
 		public readonly long Class; // the object MonoClass* as a difference from ptr_base
 		public readonly ulong Size; // size of the object on the heap
-		public readonly ulong[] RelOffset;
+		public readonly ushort[] RelOffset;
 		public readonly long[] ObjectRefs; // object referenced as a difference from obj_base
 		public readonly long[] RootRefs; // root references
 		public readonly RootType[] RootRefTypes;
@@ -545,10 +543,10 @@ namespace MonoDevelop.Profiler
 		{
 			if (exinfo == TYPE_HEAP_START) {
 				Type = EventType.Start;
-				TimeDiff = reader.ReadULeb128();
+				Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			} else if (exinfo == TYPE_HEAP_END) {
 				Type = EventType.End;
-				TimeDiff = reader.ReadULeb128();
+				Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			} else if (exinfo == TYPE_HEAP_ROOT) {
 				Type = EventType.Root;
 				ulong nroots = reader.ReadULeb128();
@@ -563,15 +561,17 @@ namespace MonoDevelop.Profiler
 				}
 			} else if (exinfo == TYPE_HEAP_OBJECT) {
 				Type = EventType.Object;
-				Object = reader.ReadSLeb128();
-				Class = reader.ReadSLeb128();
+				Object = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
+				Class = reader.BufferHeader.PtrBase + reader.ReadSLeb128();
 				Size = reader.ReadULeb128();
 				ulong num = reader.ReadULeb128();
 				ObjectRefs = new long[num];
-				RelOffset = new ulong[num];
+				RelOffset = new ushort[num];
+				ushort lastRefOffset = 0;
 				for (ulong i = 0; i < num; i++) {
-					RelOffset[i] = reader.ReadULeb128();
-					ObjectRefs[i] = reader.ReadSLeb128();
+					lastRefOffset += (ushort)reader.ReadULeb128();
+					RelOffset[i] = lastRefOffset;
+					ObjectRefs[i] = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
 				}
 			}
 		}
@@ -663,7 +663,7 @@ namespace MonoDevelop.Profiler
 
 		public UBinSampleEvent(LogFileReader reader)
 		{
-			TimeDiff = reader.ReadULeb128();
+			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			Address = reader.ReadSLeb128();
 			Offset = reader.ReadULeb128();
 			Size = reader.ReadULeb128();
@@ -805,8 +805,6 @@ namespace MonoDevelop.Profiler
 	{
 		//from `mono/profiler/proflog.h`
 		public const byte TYPE_JITHELPER = 1 << 4;
-
-		public readonly ulong Time;
 
 		public static Event Read(LogFileReader reader, byte extendedInfo)
 		{
