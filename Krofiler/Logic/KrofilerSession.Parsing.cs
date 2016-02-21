@@ -57,9 +57,14 @@ namespace Krofiler
 						break;
 					}
 				}
+				ParsingProgress = (double)reader.Position / (double)reader.Length;
 				reader.BufferHeader = buffer;
 				while (!reader.IsBufferEmpty) {
+#if DONT_ORDER_BY_TIME
+					ProcessEvent(Event.Read(reader));
+#else
 					allEvents.Add(Event.Read(reader));
+#endif
 				}
 			}
 			var allHeapObjects = new List<HeapEvent>();
@@ -139,14 +144,15 @@ namespace Krofiler
 		}
 
 		Dictionary<long, string> classIdToName = new Dictionary<long, string>();
-		public Dictionary<long, StackFrame> allocs = new Dictionary<long, StackFrame>();
+		public Dictionary<long, Tuple<uint, StackFrame>> allocs = new Dictionary<long, Tuple<uint, StackFrame>>();
+		public double ParsingProgress { get; private set; }
 		List<string> allImagesPaths = new List<string>();
 
 		void ProcessEvent(Event ev)
 		{
 			var allocEvent = ev as AllocEvent;
 			if (allocEvent != null) {
-				allocs[allocEvent.Obj] = GetStackFrame(allocEvent.Backtrace);
+				allocs[allocEvent.Obj] = Tuple.Create((uint)(ev.Time / 1000), GetStackFrame(allocEvent.Backtrace));
 				Console.WriteLine($"A:{allocEvent.Obj} {Helper.Time(ev)}");
 				return;
 			}
@@ -156,12 +162,17 @@ namespace Krofiler
 					var f = gcEvent.ObjAddr[i];
 					var t = gcEvent.ObjAddr[i + 1];
 					Console.WriteLine($"M:{f}->{t} {Helper.Time(ev)}");
-					//allocs[t] = allocs[f];
+					if (allocs.ContainsKey(f))
+						allocs[t] = allocs[f];
 					allMoves.Add(new GcMoveElement() {
 						From = f,
 						To = t
 					});
 				}
+				//GC Move events that came within 1 second of last heapshot
+				//consider them as they came before heapshot(hacky workaround runtime problem)
+				if (heapshots.Any() && gcEvent.Time - 1000000000 < heapshots.Last().endTime)
+					heapshots.Last().MovesPosition = allMoves.Count;
 				return;
 			}
 			var methodEvent = ev as MethodEvent;
@@ -197,7 +208,7 @@ namespace Krofiler
 			if (heapEvent != null) {
 				switch (heapEvent.Type) {
 					case HeapEvent.EventType.Start:
-						currentHeapshot = new Heapshot(this);
+						currentHeapshot = new Heapshot(this, "Heap " + (heapshots.Count + 1));
 						currentHeapshot.startTime = heapEvent.Time;
 						break;
 					case HeapEvent.EventType.End:

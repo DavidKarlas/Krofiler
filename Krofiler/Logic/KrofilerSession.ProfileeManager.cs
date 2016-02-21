@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace Krofiler
 {
-	//TODO: Change into permanent tcp socket session with disconnect detection and update of bool Live
 	public partial class KrofilerSession
 	{
 		/// <summary>
@@ -24,9 +23,8 @@ namespace Krofiler
 		{
 			using (var client = new TcpClient()) {
 				await client.ConnectAsync(IPAddress.Loopback, TcpPort);
-				using (var writer = new StreamWriter(client.GetStream())) {
+				using (var writer = new StreamWriter(client.GetStream()))
 					writer.Write("heapshot\n");
-				}
 			}
 		}
 

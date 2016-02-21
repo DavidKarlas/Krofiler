@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.IO;
 
 namespace Krofiler
 {
@@ -80,23 +81,27 @@ namespace Krofiler
 			}
 			if (cecils.Count < allImagesPaths.Count) {
 				for (int i = cecils.Count; i < allImagesPaths.Count; i++) {
-					cecils.Add(Mono.Cecil.ModuleDefinition.ReadModule(allImagesPaths[i]));
+					if (File.Exists(allImagesPaths[i])) {
+						try {
+							cecils.Add(Mono.Cecil.ModuleDefinition.ReadModule(allImagesPaths[i]));
+						} catch { cecils.Add(null); }
+					}
 				}
 			}
 			Mono.Cecil.TypeDefinition type = null;
 			foreach (var cecil in cecils) {
-				type = cecil.GetType(typeName);
+				type = cecil?.GetType(typeName);
 				if (type != null)
 					break;
 			}
-			ushort currentOffset = 8;//Looks like it always starts with offset 8
+			ushort currentOffset = 16;//Looks like it always starts with offset 8
 			if (type != null) {
 				foreach (var f in type.Fields) {
 					if (f.FieldType.IsPrimitive || f.FieldType.IsValueType)
 						continue;
 					if (currentOffset == fieldOffset)
 						return fieldNamesCached[key] = f.Name;
-					currentOffset += 4;
+					currentOffset += 8;
 				}
 				return fieldNamesCached[key] = "<field not found>";
 			} else {

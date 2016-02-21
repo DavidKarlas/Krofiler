@@ -6,7 +6,7 @@ using Eto.Forms;
 
 namespace Krofiler
 {
-	public class HeapshotPage : StackLayout
+	public class ObjectListTab : StackLayout, IProfilingTab
 	{
 		readonly KrofilerSession session;
 		readonly Heapshot heapshot;
@@ -15,11 +15,13 @@ namespace Krofiler
 		TextBox filterTypesTextBox;
 		FilterCollection<Tuple<long, string, int>> typesCollection = new FilterCollection<Tuple<long, string, int>>();
 		string typeNameFilter;
-		ObservableCollection<Dummy> objectsCollection = new ObservableCollection<Dummy>();
+		ObservableCollection<ObjectInfo> objectsCollection = new ObservableCollection<ObjectInfo>();
 		ObjectDetailsPanel objectPanel;
+		readonly Dictionary<long, List<long>> typesToObjectsListMap;
 
-		public HeapshotPage(KrofilerSession session, Heapshot heapshot)
+		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<long>> typesToObjectsListMap)
 		{
+			this.typesToObjectsListMap = typesToObjectsListMap;
 			this.session = session;
 			this.heapshot = heapshot;
 			this.Orientation = Orientation.Horizontal;
@@ -31,12 +33,32 @@ namespace Krofiler
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
 
-			this.Items.Add(new StackLayoutItem(filterAndTypesStackLayout, VerticalAlignment.Stretch, true));
+			this.Items.Add(new StackLayoutItem(filterAndTypesStackLayout, VerticalAlignment.Stretch));
 			CreateObjectsView();
 			this.Items.Add(new StackLayoutItem(objectsGrid, VerticalAlignment.Stretch));
-			objectPanel = new ObjectDetailsPanel(session, heapshot);
+			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
 			this.Items.Add(new StackLayoutItem(objectPanel, VerticalAlignment.Stretch, true));
 		}
+
+		public string Title {
+			get {
+				return "Objects list";
+			}
+		}
+
+		public string Details {
+			get {
+				return "";
+			}
+		}
+
+		public Control TabContent {
+			get {
+				return this;
+			}
+		}
+
+		public event InsertTabDelegate InsertTab;
 
 		void FilterTypesTextBox_TextChanged(object sender, EventArgs e)
 		{
@@ -49,7 +71,7 @@ namespace Krofiler
 
 		void CreateTypesView()
 		{
-			foreach (var type in heapshot.TypesToObjectsListMap) {
+			foreach (var type in typesToObjectsListMap) {
 				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), type.Value.Count));
 			}
 			typesGrid = new GridView {
@@ -77,8 +99,8 @@ namespace Krofiler
 			if (selectedItem == null) {
 				return;
 			}
-			foreach (var id in heapshot.TypesToObjectsListMap[selectedItem.Item1]) {
-				objectsCollection.Add(new Dummy(id));
+			foreach (var id in typesToObjectsListMap[selectedItem.Item1]) {
+				objectsCollection.Add(new ObjectInfo(id, session.allocs.ContainsKey(id) ? TimeSpan.FromTicks(session.allocs[id].Item1 * 10) : TimeSpan.FromTicks(0)));
 			}
 		}
 
@@ -91,8 +113,12 @@ namespace Krofiler
 
 
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Dummy, string>(r => r.id.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Id.ToString()) },
 				HeaderText = "Object Id"
+			});
+			objectsGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Time.ToString("G")) },
+				HeaderText = "Time"
 			});
 
 			objectsGrid.SelectedRowsChanged += ObjectsGrid_SelectedRowsChanged;
@@ -100,20 +126,22 @@ namespace Krofiler
 
 		void ObjectsGrid_SelectedRowsChanged(object sender, EventArgs e)
 		{
-			var selectedItem = objectsGrid.SelectedItem as Dummy;
+			var selectedItem = objectsGrid.SelectedItem as ObjectInfo;
 			if (selectedItem == null) {
 				return;
 			}
-			objectPanel.ObjectId = selectedItem.id;
+			objectPanel.ObjectId = selectedItem.Id;
 		}
 
-		class Dummy
+		class ObjectInfo
 		{
-			public readonly long id;
+			public readonly long Id;
+			public readonly TimeSpan Time;
 
-			public Dummy(long id)
+			public ObjectInfo(long id, TimeSpan time)
 			{
-				this.id = id;
+				this.Id = id;
+				this.Time = time;
 			}
 		}
 	}

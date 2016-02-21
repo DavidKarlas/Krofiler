@@ -15,9 +15,10 @@ namespace Krofiler
 		public int MovesPosition;
 		readonly KrofilerSession session;
 
-		public Heapshot(KrofilerSession session)
+		public Heapshot(KrofilerSession session, string name)
 		{
 			this.session = session;
+			this.Name = name;
 			MovesPosition = session.allMoves.Count;
 		}
 
@@ -25,10 +26,13 @@ namespace Krofiler
 		public Dictionary<long, List<long>> TypesToObjectsListMap = new Dictionary<long, List<long>>();
 		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
 
+		public string Name { get; set; }
+
 		public void AddObject(HeapEvent ev)
 		{
 			var typeId = ev.Class;
 			var objAddr = ev.Object;
+			Console.WriteLine(Name + " " + objAddr);
 			if (ObjectsInfoMap.ContainsKey(objAddr)) {
 				if (ObjectsInfoMap[objAddr].TypeId != typeId)
 					throw new Exception("Type of duplicate object in heap mismatch.");
@@ -43,13 +47,14 @@ namespace Krofiler
 				ObjAddr = objAddr,
 				TypeId = typeId,
 				ReferencesAt = ev.RelOffset,
-				ReferencesTo = ev.ObjectRefs.Select(r => r).ToArray(),
-				//StackFrame = session.allocs[objAddr]
+				ReferencesTo = ev.ObjectRefs,
+				StackFrame = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item2 : null
 			});
 		}
 
-		internal static IEnumerable<KeyValuePair<long, List<long>>> NewObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
+		internal static Dictionary<long, List<long>> NewObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
 		{
+			var result = new Dictionary<long, List<long>>();
 			var oldHeapShotWithMoves = (Heapshot)oldHeapShot.MemberwiseClone();
 			for (int i = oldHeapShotWithMoves.MovesPosition; i < newHeapShot.MovesPosition; i++) {
 				oldHeapShotWithMoves.ChangeAddress(newHeapShot.session.allMoves[i].From, newHeapShot.session.allMoves[i].To);
@@ -60,15 +65,16 @@ namespace Krofiler
 					if (list.Count == 0) {
 						continue;
 					} else {
-						yield return new KeyValuePair<long, List<long>>(t.Key, list);
+						result.Add(t.Key, list);
 					}
 				} else {
-					yield return t;
+					result.Add(t.Key, t.Value);
 				}
 			}
+			return result;
 		}
 
-		internal static IEnumerable<KeyValuePair<long, List<long>>> DeletedObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
+		internal static Dictionary<long, List<long>> DeletedObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
 		{
 			return NewObjects(newHeapShot, oldHeapShot);
 		}

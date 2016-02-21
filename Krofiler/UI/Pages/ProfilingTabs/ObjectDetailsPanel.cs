@@ -39,7 +39,10 @@ namespace Krofiler
 			this.heapshot = heapshot;
 			this.session = session;
 			retensionsGraph = new RetentionGraph(session, heapshot);
-			Pages.Add(new TabPage(retensionsGraph) {
+			var scrollable = new Scrollable() { Content = retensionsGraph };
+			scrollable.ExpandContentHeight = false;
+			scrollable.ExpandContentWidth = false;
+			Pages.Add(new TabPage(scrollable) {
 				Text = "Retension Path"
 			});
 			stacktraceView = new ListBox();
