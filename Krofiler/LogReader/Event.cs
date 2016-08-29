@@ -47,7 +47,8 @@ namespace MonoDevelop.Profiler
 		Heap = 6,
 		Sample = 7,
 		Runtime = 8,
-		Coverage = 9
+		Coverage = 9,
+		Meta = 10
 	}
 
 	public class Backtrace
@@ -57,7 +58,6 @@ namespace MonoDevelop.Profiler
 
 		public Backtrace(LogFileReader reader)
 		{
-			Flags = reader.ReadULeb128();
 			ulong num = reader.ReadULeb128();
 			Frame = new long[num];
 			for (ulong i = 0; i < num; i++) {
@@ -121,6 +121,8 @@ namespace MonoDevelop.Profiler
 					return RuntimeEvent.Read(reader, extendedInfo);
 				case EventType.Coverage:
 					return CoverageEvent.Read(reader, extendedInfo);
+				case EventType.Meta:
+					return MetaEvent.Read(reader, extendedInfo);
 			}
 			throw new InvalidOperationException("invalid event type " + type);
 		}
@@ -148,11 +150,9 @@ namespace MonoDevelop.Profiler
 		AllocEvent(LogFileReader reader, byte extendedInfo)
 		{
 			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
-			reader.ReadSLeb128();
 			Obj = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
 			Size = reader.ReadULeb128();
 			if ((extendedInfo & TYPE_ALLOC_BT) != 0) {
-				reader.ReadULeb128();
 				ulong num = reader.ReadULeb128();
 				Backtrace = new long[num];
 				for (ulong i = 0; i < num; i++) {
@@ -340,30 +340,24 @@ namespace MonoDevelop.Profiler
 			switch (MType) {
 				case MetaDataType.Class:
 					Image = reader.ReadSLeb128();
-					Flags = reader.ReadULeb128();
 					Name = reader.ReadNullTerminatedString();
 					break;
 				case MetaDataType.Image:
-					Flags = reader.ReadULeb128();
 					Name = reader.ReadNullTerminatedString();
 					break;
 				case MetaDataType.Assembly:
-					Flags = reader.ReadULeb128();
 					Name = reader.ReadNullTerminatedString();
 					break;
 				case MetaDataType.Thread:
-					Flags = reader.ReadULeb128();
 					if (reader.Header.Format < 11 || (reader.Header.Format > 10 && extendedInfo == 0)) {
 						Name = reader.ReadNullTerminatedString();
 					}
 					break;
 				case MetaDataType.Domain:
-					Flags = reader.ReadULeb128();
 					if (extendedInfo == 0)
 						Name = reader.ReadNullTerminatedString();
 					break;
 				case MetaDataType.Context:
-					Flags = reader.ReadULeb128();
 					Domain = reader.ReadSLeb128();
 					break;
 				default:
@@ -617,16 +611,18 @@ namespace MonoDevelop.Profiler
 	{
 		public readonly SampleType SampleType;
 		public readonly ulong Timestamp;
-		public readonly long[] InstructionPointers;
+		public readonly long[] MethodsBases;
+		public readonly long ThreadId;
 
 		public HitSampleEvent(LogFileReader reader)
 		{
-			SampleType = (SampleType)reader.ReadULeb128();
+			SampleType = (SampleType)reader.ReadByte();
 			Timestamp = reader.ReadULeb128();
+			ThreadId = reader.ReadSLeb128();
 			ulong count = reader.ReadULeb128();
-			InstructionPointers = new long[count];
+			MethodsBases = new long[count];
 			for (uint n = 0; n < count; n++)
-				InstructionPointers[n] = reader.ReadSLeb128();
+				MethodsBases[n] = reader.ReadSLeb128();
 		}
 
 		public override object Accept(EventVisitor visitor)
@@ -724,7 +720,7 @@ namespace MonoDevelop.Profiler
 		public CounterValue(LogFileReader reader, ulong index)
 		{
 			Index = index;
-			Type = (uint)reader.ReadULeb128();
+			Type = (uint)reader.ReadByte();
 			switch ((CounterValueType)Type) {
 				case CounterValueType.MONO_COUNTER_STRING:
 					if (reader.ReadULeb128() == 1)
@@ -782,9 +778,9 @@ namespace MonoDevelop.Profiler
 				SectionName = reader.ReadNullTerminatedString();
 
 			Name = reader.ReadNullTerminatedString();
-			Type = reader.ReadULeb128();
-			Unit = reader.ReadULeb128();
-			Variance = reader.ReadULeb128();
+			Type = reader.ReadByte();
+			Unit = reader.ReadByte();
+			Variance = reader.ReadByte();
 			Index = reader.ReadULeb128();
 		}
 	}
@@ -833,7 +829,7 @@ namespace MonoDevelop.Profiler
 
 		public RuntimeJitHelperEvent(LogFileReader reader) : base(reader)
 		{
-			Type = reader.ReadULeb128();
+			Type = reader.ReadByte();
 			BufferAddress = reader.ReadSLeb128();
 			BufferSize = reader.ReadULeb128();
 			if (Type == (ulong)MonoProfilerCodeBufferType.MONO_PROFILER_CODE_BUFFER_SPECIFIC_TRAMPOLINE) {
@@ -860,6 +856,24 @@ namespace MonoDevelop.Profiler
 			MONO_PROFILER_CODE_BUFFER_MONITOR,
 			MONO_PROFILER_CODE_BUFFER_DELEGATE_INVOKE,
 			MONO_PROFILER_CODE_BUFFER_LAST
+		}
+	}
+
+	public class MetaEvent : Event
+	{
+		public byte Type;
+
+		internal static Event Read(LogFileReader reader, byte extendedInfo)
+		{
+			var newEvent = new MetaEvent();
+			newEvent.Time = reader.ReadULeb128();
+			newEvent.Type = reader.ReadByte();
+			return newEvent;
+		}
+
+		public override object Accept(EventVisitor visitor)
+		{
+			return visitor.Visit(this);
 		}
 	}
 
