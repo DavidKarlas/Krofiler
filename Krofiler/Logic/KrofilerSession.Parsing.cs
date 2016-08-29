@@ -153,7 +153,7 @@ namespace Krofiler
 			var allocEvent = ev as AllocEvent;
 			if (allocEvent != null) {
 				allocs[allocEvent.Obj] = Tuple.Create((uint)(ev.Time / 1000), GetStackFrame(allocEvent.Backtrace));
-				Console.WriteLine($"A:{allocEvent.Obj} {Helper.Time(ev)}");
+				//Console.WriteLine($"A:{allocEvent.Obj} {Helper.Time(ev)}");
 				return;
 			}
 			var gcEvent = ev as MoveGcEvent;
@@ -161,7 +161,7 @@ namespace Krofiler
 				for (var i = 0; i < gcEvent.ObjAddr.Length; i += 2) {
 					var f = gcEvent.ObjAddr[i];
 					var t = gcEvent.ObjAddr[i + 1];
-					Console.WriteLine($"M:{f}->{t} {Helper.Time(ev)}");
+					//Console.WriteLine($"M:{f}->{t} {Helper.Time(ev)}");
 					if (allocs.ContainsKey(f))
 						allocs[t] = allocs[f];
 					allMoves.Add(new GcMoveElement() {
@@ -208,10 +208,12 @@ namespace Krofiler
 			if (heapEvent != null) {
 				switch (heapEvent.Type) {
 					case HeapEvent.EventType.Start:
+						Console.WriteLine("Start:" + heapshots.Count);
 						currentHeapshot = new Heapshot(this, "Heap " + (heapshots.Count + 1));
 						currentHeapshot.startTime = heapEvent.Time;
 						break;
 					case HeapEvent.EventType.End:
+						Console.WriteLine("End:" + heapshots.Count);
 						currentHeapshot.endTime = heapEvent.Time;
 						heapshots.Add(currentHeapshot);
 						NewHeapshot?.Invoke(this, currentHeapshot);

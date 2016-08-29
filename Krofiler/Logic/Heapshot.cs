@@ -33,23 +33,23 @@ namespace Krofiler
 			var typeId = ev.Class;
 			var objAddr = ev.Object;
 			Console.WriteLine(Name + " " + objAddr);
-			if (ObjectsInfoMap.ContainsKey(objAddr)) {
-				if (ObjectsInfoMap[objAddr].TypeId != typeId)
-					throw new Exception("Type of duplicate object in heap mismatch.");
-				return;
-			}
+			//if (ObjectsInfoMap.ContainsKey(objAddr)) {
+			//	if (ObjectsInfoMap[objAddr].TypeId != typeId)
+			//		throw new Exception("Type of duplicate object in heap mismatch.");
+			//	return;
+			//}
 			totalSize += ev.Size;
 			totalObjects++;
 			if (!TypesToObjectsListMap.ContainsKey(typeId))
 				TypesToObjectsListMap[typeId] = new List<long>();
 			TypesToObjectsListMap[typeId].Add(objAddr);
-			ObjectsInfoMap.Add(objAddr, new ObjectInfo() {
+			ObjectsInfoMap[objAddr] = new ObjectInfo() {
 				ObjAddr = objAddr,
 				TypeId = typeId,
 				ReferencesAt = ev.RelOffset,
 				ReferencesTo = ev.ObjectRefs,
 				StackFrame = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item2 : null
-			});
+			};
 		}
 
 		internal static Dictionary<long, List<long>> NewObjects(Heapshot oldHeapShot, Heapshot newHeapShot)

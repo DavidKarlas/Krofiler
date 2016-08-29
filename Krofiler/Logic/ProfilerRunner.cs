@@ -17,7 +17,7 @@ namespace Krofiler
 			profileProcess = new Process();
 			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono";
 			//profileProcess.StartInfo.FileName = "/opt9/mono/bin/mono";
-			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,alloc,nocalls,maxframes=999,output=\"{LogFilePath}\" \"{exePath}\"";
+			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,noalloc,nocalls,maxframes=999,output=\"{LogFilePath}\" \"{exePath}\"";
 			//profileProcess.StartInfo.UseShellExecute = false;
 			//profileProcess.StartInfo.RedirectStandardOutput = true;
 			//profileProcess.StartInfo.RedirectStandardError = true;
