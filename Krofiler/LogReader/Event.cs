@@ -66,6 +66,14 @@ namespace MonoDevelop.Profiler
 		}
 	}
 
+	public class DumbEvent : Event
+	{
+		public override object Accept(EventVisitor visitor)
+		{
+			return null;
+		}
+	}
+
 	public abstract class Event
 	{
 		/// <summary>
@@ -83,6 +91,10 @@ namespace MonoDevelop.Profiler
 		public const byte TYPE_GC_HANDLE_DESTROYED = 5 << 4;
 		public const byte TYPE_GC_HANDLE_CREATED_BT = 6 << 4;
 		public const byte TYPE_GC_HANDLE_DESTROYED_BT = 7 << 4;
+		public const byte FinalizeStart = 8 << 4;
+		public const byte FinalizeEnd = 9 << 4;
+		public const byte FinalizeObjectStart = 10 << 4;
+		public const byte FinalizeObjectEnd = 11 << 4;
 
 		public static Event CreateEvent(LogFileReader reader, EventType type, byte extendedInfo)
 		{
@@ -105,6 +117,16 @@ namespace MonoDevelop.Profiler
 						case TYPE_GC_HANDLE_DESTROYED:
 						case TYPE_GC_HANDLE_DESTROYED_BT:
 							return HandleDestroyedGcEvent.Read(reader, extendedInfo);
+						case FinalizeStart:
+						case FinalizeEnd:
+							return new DumbEvent() {
+								Time = reader.ReadULeb128()
+							};
+						case FinalizeObjectStart:
+						case FinalizeObjectEnd:
+							reader.ReadULeb128();
+							reader.ReadULeb128();
+							return new DumbEvent();
 					}
 					throw new InvalidOperationException("unknown gc type:" + extendedInfo);
 				case EventType.Heap:
@@ -150,13 +172,15 @@ namespace MonoDevelop.Profiler
 		AllocEvent(LogFileReader reader, byte extendedInfo)
 		{
 			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
+			reader.ReadSLeb128();
 			Obj = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
 			Size = reader.ReadULeb128();
 			if ((extendedInfo & TYPE_ALLOC_BT) != 0) {
 				ulong num = reader.ReadULeb128();
 				Backtrace = new long[num];
 				for (ulong i = 0; i < num; i++) {
-					Backtrace[i] = reader.BufferHeader.PtrBase + reader.ReadSLeb128();
+					reader.BufferHeader.MethodBase += reader.ReadSLeb128();
+					Backtrace[i] = reader.BufferHeader.MethodBase;
 				}
 			} else {
 				Backtrace = new long[0];
@@ -218,8 +242,8 @@ namespace MonoDevelop.Profiler
 		GcEvent(LogFileReader reader)
 		{
 			Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
-			EventType = (GcEventType)reader.ReadULeb128();
-			Generation = reader.ReadULeb128();
+			EventType = (GcEventType)reader.ReadByte();
+			Generation = reader.ReadByte();
 		}
 
 		public static new Event Read(LogFileReader reader)
@@ -543,18 +567,20 @@ namespace MonoDevelop.Profiler
 				Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 			} else if (exinfo == TYPE_HEAP_ROOT) {
 				Type = EventType.Root;
+				reader.ReadULeb128();
 				ulong nroots = reader.ReadULeb128();
 				reader.ReadULeb128(); // gcs
 				RootRefs = new long[nroots];
 				RootRefTypes = new RootType[nroots];
 				RootRefExtraInfos = new ulong[nroots];
 				for (ulong n = 0; n < nroots; n++) {
-					RootRefs[n] = reader.ReadSLeb128();
-					RootRefTypes[n] = (RootType)reader.ReadULeb128();
+					RootRefs[n] = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
+					RootRefTypes[n] = (RootType)reader.ReadByte();
 					RootRefExtraInfos[n] = reader.ReadULeb128();
 				}
 			} else if (exinfo == TYPE_HEAP_OBJECT) {
 				Type = EventType.Object;
+				Time = reader.BufferHeader.TimeBase + reader.ReadULeb128();
 				Object = reader.BufferHeader.ObjBase + reader.ReadSLeb128();
 				Class = reader.BufferHeader.PtrBase + reader.ReadSLeb128();
 				Size = reader.ReadULeb128();
@@ -679,6 +705,7 @@ namespace MonoDevelop.Profiler
 
 		public CountersDescEvent(LogFileReader reader)
 		{
+			reader.ReadULeb128();
 			Len = reader.ReadULeb128();
 			Sections = new CounterSection[Len];
 			for (ulong i = 0; i < Len; i++) {
@@ -806,7 +833,7 @@ namespace MonoDevelop.Profiler
 		{
 			if (extendedInfo == TYPE_JITHELPER)
 				return new RuntimeJitHelperEvent(reader);
-			throw new ArgumentException("Unknown `RuntimeEventType`: " + extendedInfo);
+			return new DumbEvent();
 		}
 
 		public RuntimeEvent(LogFileReader reader)

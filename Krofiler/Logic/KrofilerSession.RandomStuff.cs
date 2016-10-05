@@ -94,14 +94,14 @@ namespace Krofiler
 				if (type != null)
 					break;
 			}
-			ushort currentOffset = 16;//Looks like it always starts with offset 8
+			var currentOffset = header.PtrSize == 4 ? 8 : 16;
 			if (type != null) {
 				foreach (var f in type.Fields) {
 					if (f.FieldType.IsPrimitive || f.FieldType.IsValueType)
 						continue;
+					currentOffset += header.PtrSize;
 					if (currentOffset == fieldOffset)
 						return fieldNamesCached[key] = f.Name;
-					currentOffset += 8;
 				}
 				return fieldNamesCached[key] = "<field not found>";
 			} else {

@@ -26,6 +26,7 @@
 
 using System;
 using System.IO;
+using System.Threading;
 using MonoDevelop.Profiler;
 
 namespace HeapShot.Reader
@@ -137,7 +138,30 @@ namespace HeapShot.Reader
 			position += 8;
 			return (((ulong) ret_high) << 32) | ret_low;
 		}
-			
+
+		internal string ReadHeaderString()
+		{
+			const int RepeatsCount = 20;
+			const int RepeatTimeoutMiliseconds = 100;
+			for (int i = 0; i <= RepeatsCount; i++) {
+				if (LoadData(4))
+					break;
+				Thread.Sleep(RepeatTimeoutMiliseconds);
+				if (i == RepeatsCount)
+					throw new TimeoutException("Failed to read");
+			}
+			var len = ReadInt32();
+			for (int i = 0; i <= RepeatsCount; i++) {
+				if (LoadData(len))
+					break;
+				Thread.Sleep(RepeatTimeoutMiliseconds);
+				if (i == RepeatsCount)
+					throw new TimeoutException("Failed to read");
+			}
+			position = len;
+			return System.Text.Encoding.UTF8.GetString(buffer, 0, len);
+		}
+
 		public ulong ReadULeb128 ()
 		{
 			ulong result = 0;

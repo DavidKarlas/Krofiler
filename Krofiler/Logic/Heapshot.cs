@@ -32,12 +32,21 @@ namespace Krofiler
 		{
 			var typeId = ev.Class;
 			var objAddr = ev.Object;
-			Console.WriteLine(Name + " " + objAddr);
+			//Console.WriteLine(Name + " " + objAddr);
 			//if (ObjectsInfoMap.ContainsKey(objAddr)) {
 			//	if (ObjectsInfoMap[objAddr].TypeId != typeId)
 			//		throw new Exception("Type of duplicate object in heap mismatch.");
 			//	return;
 			//}
+
+			foreach (var o in ev.ObjectRefs) {
+				ObjectInfo v;
+				if (ObjectsInfoMap.TryGetValue(o, out v))
+					v.ReferencesFrom.Add(objAddr);
+				else
+					Console.WriteLine($"Failed to do RF:{objAddr}:{o}");
+			}
+
 			totalSize += ev.Size;
 			totalObjects++;
 			if (!TypesToObjectsListMap.ContainsKey(typeId))
@@ -48,7 +57,8 @@ namespace Krofiler
 				TypeId = typeId,
 				ReferencesAt = ev.RelOffset,
 				ReferencesTo = ev.ObjectRefs,
-				StackFrame = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item2 : null
+				StackFrame = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item2 : null,
+				IsRoot = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item3 : false
 			};
 		}
 

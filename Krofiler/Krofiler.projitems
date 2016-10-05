@@ -50,6 +50,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\HomeTab.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\RetentionGraph.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectsListTab.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)EmptyClass.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MyClass.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)LogReader\" />

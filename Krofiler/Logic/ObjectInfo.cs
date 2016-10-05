@@ -24,7 +24,10 @@ namespace Krofiler
 		}
 
 		StackFrame sf;
+		internal List<long> ReferencesFrom = new List<long>();
+
 		public StackFrame StackFrame { get; set; }
+		public bool IsRoot { get; internal set; }
 		//{
 		//if (sf != null)
 		//	return sf;

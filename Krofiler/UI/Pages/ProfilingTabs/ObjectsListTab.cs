@@ -99,9 +99,11 @@ namespace Krofiler
 			if (selectedItem == null) {
 				return;
 			}
+			objectsGrid.DataStore = null;
 			foreach (var id in typesToObjectsListMap[selectedItem.Item1]) {
 				objectsCollection.Add(new ObjectInfo(id, session.allocs.ContainsKey(id) ? TimeSpan.FromTicks(session.allocs[id].Item1 * 10) : TimeSpan.FromTicks(0)));
 			}
+			objectsGrid.DataStore = objectsCollection;
 		}
 
 		void CreateObjectsView()

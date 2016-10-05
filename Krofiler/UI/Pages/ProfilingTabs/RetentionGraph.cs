@@ -35,41 +35,31 @@ namespace Krofiler
 			base.OnPaint(e);
 		}
 
-		int spaceNeeded(long objId)
-		{
-			if (objId == 0 || spvisited.Contains(objId))
-				return 0;
-			spvisited.Add(objId);
-			var objInfo = heapshot.ObjectsInfoMap[objId];
-			int total = 0;
-			foreach (var b in objInfo.GetReferencesFrom(heapshot)) {
-				total += spaceNeeded(b);
-			}
-			return Math.Max(1, total);
-		}
-
-
 		void DrawRow(PaintEventArgs e, long objId, int depth, int currentX)
 		{
-			if (objId == 0 || visited.Contains(objId))
+			if (objId == 0)
 				return;
-			visited.Add(objId);
 			var objInfo = heapshot.ObjectsInfoMap[objId];
 			int currentY = SpacingY + (RowHeight + SpacingY) * depth++;
-			e.Graphics.FillRectangle(Brushes.AntiqueWhite, currentX, currentY, BubbleWidth, RowHeight);
+			var size = e.Graphics.MeasureString(Fonts.Sans(12), session.GetTypeName(objInfo.TypeId));
+			e.Graphics.FillRectangle(objInfo.IsRoot ? Brushes.AliceBlue : Brushes.AntiqueWhite, currentX, currentY, Math.Max(BubbleWidth, (int)size.Width) + 10, RowHeight);
 			e.Graphics.DrawText(Fonts.Sans(12), Colors.Black, currentX + 5, currentY + 5, session.GetTypeName(objInfo.TypeId));
 			e.Graphics.DrawText(Fonts.Sans(12), Colors.Black, currentX + 5, currentY + 5 + 13, objInfo.ObjAddr.ToString());
-			foreach (var b in objInfo.GetReferencesFrom(heapshot)) {
+
+			if (visited.Contains(objId))
+				return;
+			visited.Add(objId);
+
+			foreach (var b in objInfo.ReferencesFrom) {
 				var retObjInfo = heapshot.ObjectsInfoMap[b];
 				for (int i = 0; i < retObjInfo.ReferencesTo.Length; i++) {
 					if (retObjInfo.ReferencesTo[i] == objId) {
 						e.Graphics.DrawText(Fonts.Sans(11), SolidBrush.Instantiator(Colors.Red), currentX, currentY + RowHeight + 7, session.GetFieldName(retObjInfo.TypeId, retObjInfo.ReferencesAt[i]));
+						break;
 					}
 				}
 				DrawRow(e, b, depth, currentX);
-				spvisited.Clear();
-				//currentX += spaceNeeded(b) * (BubbleWidth + SpacingX);
-				//currentX -= BubbleWidth + SpacingX;
+				currentX += Math.Max(BubbleWidth, (int)size.Width) + 20;
 			}
 		}
 	}

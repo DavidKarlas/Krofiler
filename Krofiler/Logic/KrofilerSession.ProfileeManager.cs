@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Krofiler
 {
@@ -23,8 +24,11 @@ namespace Krofiler
 		{
 			using (var client = new TcpClient()) {
 				await client.ConnectAsync(IPAddress.Loopback, TcpPort);
-				using (var writer = new StreamWriter(client.GetStream()))
+				using (var writer = new StreamWriter(client.GetStream())) {
 					writer.Write("heapshot\n");
+					writer.Flush();
+					Thread.Sleep(1000);
+				}
 			}
 		}
 

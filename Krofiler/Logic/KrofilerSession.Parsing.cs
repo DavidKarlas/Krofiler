@@ -13,6 +13,7 @@ namespace Krofiler
 	public partial class KrofilerSession
 	{
 		ProfilerRunner runner;
+		Header header;
 
 		public void ProcessFile()
 		{
@@ -37,7 +38,7 @@ namespace Krofiler
 			} catch {
 				goto retryOpeningLogfile;
 			}
-			var header = Header.Read(reader);
+			header = Header.Read(reader);
 			if (header == null) {
 				goto retryOpeningLogfile;
 			}
@@ -61,12 +62,17 @@ namespace Krofiler
 				reader.BufferHeader = buffer;
 				while (!reader.IsBufferEmpty) {
 #if DONT_ORDER_BY_TIME
-					ProcessEvent(Event.Read(reader));
+					var evnt = Event.Read(reader);
+					while (evnts.Count > 5)
+						evnts.Dequeue();
+					evnts.Enqueue(evnt);
+					ProcessEvent(evnt);
 #else
 					allEvents.Add(Event.Read(reader));
 #endif
 				}
 			}
+
 			var allHeapObjects = new List<HeapEvent>();
 			foreach (var ev in allEvents) {
 				var heapEvent = ev as HeapEvent;
@@ -89,6 +95,8 @@ namespace Krofiler
 			DoSomeCoolStuff();
 #endif
 		}
+
+		static Queue<Event> evnts = new Queue<Event>();
 
 		CancellationTokenSource cts = new CancellationTokenSource();
 		Thread parsingThread;
@@ -144,7 +152,8 @@ namespace Krofiler
 		}
 
 		Dictionary<long, string> classIdToName = new Dictionary<long, string>();
-		public Dictionary<long, Tuple<uint, StackFrame>> allocs = new Dictionary<long, Tuple<uint, StackFrame>>();
+		public Dictionary<long, Tuple<uint, StackFrame, bool>> allocs = new Dictionary<long, Tuple<uint, StackFrame, bool>>();
+		public Dictionary<long, Tuple<HeapEvent.RootType, ulong>> roots = new Dictionary<long, Tuple<HeapEvent.RootType, ulong>>();
 		public double ParsingProgress { get; private set; }
 		List<string> allImagesPaths = new List<string>();
 
@@ -152,7 +161,7 @@ namespace Krofiler
 		{
 			var allocEvent = ev as AllocEvent;
 			if (allocEvent != null) {
-				allocs[allocEvent.Obj] = Tuple.Create((uint)(ev.Time / 1000), GetStackFrame(allocEvent.Backtrace));
+				allocs[allocEvent.Obj] = Tuple.Create((uint)(ev.Time / 1000), GetStackFrame(allocEvent.Backtrace), false);
 				//Console.WriteLine($"A:{allocEvent.Obj} {Helper.Time(ev)}");
 				return;
 			}
@@ -220,9 +229,14 @@ namespace Krofiler
 						currentHeapshot = null;
 						break;
 					case HeapEvent.EventType.Root:
-						//for (int i = 0; i < heapEvent.RootRefs.Length; i++) {
-						//	currentHeapshot.AddRootRef(heapEvent.RootRefs[i], heapEvent.RootRefTypes[i], heapEvent.RootRefExtraInfos[i]);
-						//}
+						for (int i = 0; i < heapEvent.RootRefs.Length; i++) {
+							Tuple<uint, StackFrame, bool> val;
+							if (allocs.TryGetValue(heapEvent.RootRefs[i], out val))
+								allocs[heapEvent.RootRefs[i]] = Tuple.Create(val.Item1, val.Item2, true);
+							else
+								Console.WriteLine("oh joj");
+							//roots[heapEvent.RootRefs[i]] = new Tuple<HeapEvent.RootType, ulong>(heapEvent.RootRefTypes[i], heapEvent.RootRefExtraInfos[i]);
+						}
 						break;
 					case HeapEvent.EventType.Object:
 						currentHeapshot.AddObject(heapEvent);
