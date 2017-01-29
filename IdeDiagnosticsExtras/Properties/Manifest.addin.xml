@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionModel>
+	<Extension path="/MonoDevelop/Ide/Commands">
+		<Command id="IdeDiagnosticsExtras.TakeHeapshot"
+			defaultHandler="IdeDiagnosticsExtras.TakeHeapshot"
+			_label="Take heapshot" />
+	</Extension>
+	<Extension path="/MonoDevelop/Ide/MainMenu/Help/Diagnostics">
+		<CommandItem id="IdeDiagnosticsExtras.TakeHeapshot" />
+	</Extension>
+	<Runtime>
+		<Import file="libMonoProfiler.dylib" />
+	</Runtime>
+</ExtensionModel>

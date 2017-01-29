@@ -4,11 +4,11 @@ namespace Krofiler
 {
 	public class ObjectDetailsPanel : TabControl
 	{
-		readonly KrofilerSession session;
 		readonly Heapshot heapshot;
 		RetentionGraph retensionsGraph;
 		ListBox stacktraceView;
-
+		TextArea stringValue;
+		TabPage stringValuePage;
 		long objAddr;
 		public long ObjectId {
 			get {
@@ -25,23 +25,27 @@ namespace Krofiler
 		void OnObjectIdChanged()
 		{
 			stacktraceView.Items.Clear();
-			var sf = heapshot.ObjectsInfoMap[objAddr].StackFrame;
-			while (sf != null) {
-				stacktraceView.Items.Add(sf.MethodName);
-				sf = sf.Parent;
+			var sf = heapshot[ObjectId].allocStack;
+			if (sf != null)
+				foreach (var m in sf)
+					stacktraceView.Items.Add(m);
+			retensionsGraph.ObjectId = ObjectId;
+			if (heapshot[ObjectId].ClassId == 2) {
+				stringValue.Text = heapshot[ObjectId].StringValue;
+				stringValuePage.Visible = true;
+			} else {
+				stringValuePage.Visible = false;
 			}
-			retensionsGraph.ObjectId = objAddr;
 			Invalidate();
 		}
 
 		public ObjectDetailsPanel(KrofilerSession session, Heapshot heapshot)
 		{
 			this.heapshot = heapshot;
-			this.session = session;
 			retensionsGraph = new RetentionGraph(session, heapshot);
 			var scrollable = new Scrollable() { Content = retensionsGraph };
-			scrollable.ExpandContentHeight = false;
-			scrollable.ExpandContentWidth = false;
+			scrollable.ExpandContentHeight = true;
+			scrollable.ExpandContentWidth = true;
 			Pages.Add(new TabPage(scrollable) {
 				Text = "Retension Path"
 			});
@@ -49,6 +53,11 @@ namespace Krofiler
 			Pages.Add(new TabPage(stacktraceView) {
 				Text = "Creation Stacktrace"
 			});
+			stringValue = new TextArea();
+			stringValuePage = new TabPage(stringValue) {
+				Text = "String Value"
+			};
+			Pages.Add(stringValuePage);
 		}
 	}
 }

@@ -12,7 +12,7 @@ namespace Krofiler
 
 	public class StartProfilingFromFileInfo : StartProfilingInfo
 	{
-		public string MlpdFilePath { get; set; }
+		public string KrofFilePath { get; set; }
 	}
 
 	public class StartProfilingProcessInfo : StartProfilingInfo

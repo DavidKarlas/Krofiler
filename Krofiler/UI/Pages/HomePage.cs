@@ -29,7 +29,7 @@ namespace Krofiler
 				var openFileDialog = new OpenFileDialog();
 				openFileDialog.CheckFileExists = true;
 				openFileDialog.MultiSelect = false;
-				openFileDialog.Filters.Add(new FileDialogFilter("MLPD", "mlpd"));
+				openFileDialog.Filters.Add(new FileDialogFilter("Krof", "krof"));
 				if (DialogResult.Ok == openFileDialog.ShowDialog(this)) {
 					StartFromFile(openFileDialog.FileName);
 				}
@@ -75,7 +75,7 @@ namespace Krofiler
 			Settings.Instance.Save();
 
 			StartProfiling(new StartProfilingFromFileInfo() {
-				MlpdFilePath = fileName
+				KrofFilePath = fileName
 			});
 		}
 

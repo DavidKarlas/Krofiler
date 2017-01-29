@@ -13,13 +13,14 @@ namespace Krofiler
 		GridView typesGrid;
 		GridView objectsGrid;
 		TextBox filterTypesTextBox;
-		FilterCollection<Tuple<long, string, int>> typesCollection = new FilterCollection<Tuple<long, string, int>>();
+		FilterCollection<Tuple<ushort, string, int>> typesCollection = new FilterCollection<Tuple<ushort, string, int>>();
 		string typeNameFilter;
 		ObservableCollection<ObjectInfo> objectsCollection = new ObservableCollection<ObjectInfo>();
 		ObjectDetailsPanel objectPanel;
-		readonly Dictionary<long, List<long>> typesToObjectsListMap;
+		readonly Dictionary<ushort, List<long>> typesToObjectsListMap;
 
-		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<long>> typesToObjectsListMap)
+		StackLayout filterAndTypesStackLayout;
+		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<ushort, List<long>> typesToObjectsListMap)
 		{
 			this.typesToObjectsListMap = typesToObjectsListMap;
 			this.session = session;
@@ -29,15 +30,21 @@ namespace Krofiler
 			filterTypesTextBox = new TextBox();
 			filterTypesTextBox.TextChanged += FilterTypesTextBox_TextChanged;
 
-			var filterAndTypesStackLayout = new StackLayout();
+			filterAndTypesStackLayout = new StackLayout();
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
-
+			filterAndTypesStackLayout.Width = this.Width / 3;
 			this.Items.Add(new StackLayoutItem(filterAndTypesStackLayout, VerticalAlignment.Stretch));
 			CreateObjectsView();
 			this.Items.Add(new StackLayoutItem(objectsGrid, VerticalAlignment.Stretch));
 			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
-			this.Items.Add(new StackLayoutItem(objectPanel, VerticalAlignment.Stretch, true));
+			this.Items.Add(new StackLayoutItem(objectPanel, HorizontalAlignment.Stretch, true));
+		}
+
+		protected override void OnSizeChanged(EventArgs e)
+		{
+			base.OnSizeChanged(e);
+			filterAndTypesStackLayout.Width = this.Width / 3;
 		}
 
 		public string Title {
@@ -71,8 +78,8 @@ namespace Krofiler
 
 		void CreateTypesView()
 		{
-			foreach (var type in typesToObjectsListMap) {
-				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), type.Value.Count));
+			foreach (var type in typesToObjectsListMap.OrderByDescending(t => t.Value.Count)) {
+				typesCollection.Add(Tuple.Create(type.Key, heapshot.GetTypeName(type.Key), type.Value.Count));
 			}
 			typesGrid = new GridView {
 				DataStore = typesCollection
@@ -80,12 +87,11 @@ namespace Krofiler
 			typesGrid.AllowMultipleSelection = false;
 
 			typesGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int>, string>(r => r.Item3.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<ushort, string, int>, string>(r => r.Item3.ToString()) },
 				HeaderText = "Objects #"
 			});
-
 			typesGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int>, string>(r => r.Item2) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<ushort, string, int>, string>(r => r.Item2) },
 				HeaderText = "Type Name"
 			});
 
@@ -94,7 +100,7 @@ namespace Krofiler
 
 		void Grid_SelectedRowsChanged(object sender, EventArgs e)
 		{
-			var selectedItem = typesGrid.SelectedItem as Tuple<long, string, int>;
+			var selectedItem = typesGrid.SelectedItem as Tuple<ushort, string, int>;
 			objectsCollection.Clear();
 			if (selectedItem == null) {
 				return;
@@ -111,12 +117,18 @@ namespace Krofiler
 			objectsGrid = new GridView() {
 				DataStore = objectsCollection
 			};
+			objectsGrid.ContextMenu = new ContextMenu(new ButtonMenuItem(new Command((sender, e) => {
+				using (var clipboard = new Clipboard())
+					clipboard.Text = "0x" + ((ObjectInfo)objectsGrid.SelectedItem).Id.ToString("X");
+			}) {
+				MenuText = "Copy"
+			}));
 			objectsGrid.AllowMultipleSelection = false;
 
 
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Id.ToString()) },
-				HeaderText = "Object Id"
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => "0x" + r.Id.ToString("X")) },
+				HeaderText = "Address"
 			});
 			objectsGrid.Columns.Add(new GridColumn {
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Time.ToString("G")) },

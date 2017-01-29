@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Eto.Forms;
 using System.Collections;
 using System.Linq;
+using Krofiler.Reader;
+using System.Diagnostics;
+
 namespace Krofiler
 {
 	public class CompareHeapshotsTab : Panel, IProfilingTab
@@ -36,7 +39,7 @@ namespace Krofiler
 		class TypeChangeInfo
 		{
 			public string TypeName;
-			public long TypeId;
+			public ushort TypeId;
 			public List<long> NewObjects;
 			public List<long> CollectedObjects;
 			public List<long> NewHsObjects;
@@ -46,33 +49,86 @@ namespace Krofiler
 
 		static List<long> EmptyList = new List<long>();
 
+		internal static IEnumerable<long> GetObjects(Heapshot oldHeapshot, Heapshot newHeapshot, bool newOrCollected)
+		{
+			var oldHeapshotClone = new Heapshot(oldHeapshot.Id, oldHeapshot.Session, oldHeapshot.AllocsAndMovesStartPosition);
+			foreach (var item in oldHeapshot) {
+				oldHeapshotClone.Add(item.Key, item.Value);
+			}
+			//for (int i = oldHeapshot.AllocsAndMovesStartPosition; i < newHeapshot.AllocsAndMovesStartPosition; i++) {
+			//	var obj = newHeapshot.Session.AllAllocsAndMoves[i];
+			//	if (obj is HeapAlloc) {
+			//		Debug.WriteLine($"{((HeapAlloc)obj).Address:X}");
+			//	} else if (obj is HeapMoves) {
+			//		var movs = ((HeapMoves)obj).Moves;
+			//		for (int j = 0; j < movs.Length; j += 2) {
+			//			Debug.WriteLine($"{j} {movs[j]:X} - {movs[j + 1]:X}");
+			//		}
+			//	}
+			//}
+			for (int i = oldHeapshot.AllocsAndMovesStartPosition; i < newHeapshot.AllocsAndMovesStartPosition; i++) {
+				var obj = newHeapshot.Session.AllAllocsAndMoves[i];
+				if (obj is HeapAlloc) {
+					oldHeapshotClone[((HeapAlloc)obj).Address] = new HeapObject(((HeapAlloc)obj).Address, ((HeapAlloc)obj).AllocStack);
+				} else if (obj is HeapMoves) {
+					var movs = ((HeapMoves)obj).Moves;
+					for (int j = 0; j < movs.Length; j += 2) {
+						HeapObject hObj;
+						if (oldHeapshotClone.TryGetValue(movs[j], out hObj))
+							oldHeapshotClone[movs[j + 1]] = hObj;
+						//oldHeapshotClone[movs[j + 1]] = oldHeapshotClone[movs[j]];
+					}
+				}
+			}
+			if (newOrCollected) {
+				foreach (var item in newHeapshot.Keys) {
+					HeapObject ob;
+					if (oldHeapshotClone.TryGetValue(item, out ob)) {
+						if (ob.ClassId == 0) {
+							newHeapshot[item].allocStack = ob.allocStack;
+							newHeapshot[item].AllocAddress = ob.Address;
+							yield return item;
+						}
+					} else {
+						yield return item;
+					}
+				}
+			} else {
+				foreach (var item in oldHeapshotClone) {
+					if (!newHeapshot.ContainsKey(item.Key) && item.Value.ClassId != 0)
+						yield return item.Value.Address;
+				}
+			}
+		}
+
 		public CompareHeapshotsTab(KrofilerSession session, Heapshot hs1, Heapshot hs2)
 		{
 			this.session = session;
-			if (hs2.endTime > hs1.endTime) {
+			if (hs2.Id > hs1.Id) {
 				newHeapshot = hs2;
 				oldHeapshot = hs1;
 			} else {
 				newHeapshot = hs1;
 				oldHeapshot = hs2;
 			}
-			var newObjects = Heapshot.NewObjects(oldHeapshot, newHeapshot);
-			var collectedObjects = Heapshot.DeletedObjects(oldHeapshot, newHeapshot);
-			var allObjectsInOldHs = oldHeapshot.TypesToObjectsListMap;
-			var allObjectsInNewHs = newHeapshot.TypesToObjectsListMap;
-			var hashTableAllTypes = new HashSet<long>();
-			foreach (var t in allObjectsInOldHs)
+
+			var newObjects = GetObjects(oldHeapshot, newHeapshot, true).GroupBy(addr => newHeapshot[addr].ClassId).ToDictionary(d => d.Key, d => d.ToList());
+			var collectedObjects = GetObjects(oldHeapshot, newHeapshot, false).GroupBy(addr => oldHeapshot[addr].ClassId).ToDictionary(d => d.Key, d => d.ToList());
+			var allInOld = oldHeapshot.GroupBy(addr => addr.Value.ClassId).ToDictionary(d => d.Key, d => d.Select(o => o.Value.Address).ToList());
+			var allInNew = newHeapshot.GroupBy(addr => addr.Value.ClassId).ToDictionary(d => d.Key, d => d.Select(o => o.Value.Address).ToList());
+			var hashTableAllTypes = new HashSet<ushort>();
+			foreach (var t in newObjects)
 				hashTableAllTypes.Add(t.Key);
-			foreach (var t in allObjectsInNewHs)
+			foreach (var t in collectedObjects)
 				hashTableAllTypes.Add(t.Key);
 			foreach (var typeId in hashTableAllTypes) {
 				typesCollection.Add(new TypeChangeInfo {
 					TypeId = typeId,
-					TypeName = session.GetTypeName(typeId),
+					TypeName = newHeapshot.GetTypeName(typeId),
 					NewObjects = newObjects.ContainsKey(typeId) ? newObjects[typeId] : EmptyList,
 					CollectedObjects = collectedObjects.ContainsKey(typeId) ? collectedObjects[typeId] : EmptyList,
-					OldHsObjects = allObjectsInOldHs.ContainsKey(typeId) ? allObjectsInOldHs[typeId] : EmptyList,
-					NewHsObjects = allObjectsInNewHs.ContainsKey(typeId) ? allObjectsInNewHs[typeId] : EmptyList
+					OldHsObjects = allInOld.ContainsKey(typeId) ? allInOld[typeId] : EmptyList,
+					NewHsObjects = allInNew.ContainsKey(typeId) ? allInNew[typeId] : EmptyList
 				});
 			}
 			filterTypesTextBox = new TextBox();
@@ -131,16 +187,25 @@ namespace Krofiler
 				MenuText = "Select New objects"
 			};
 			newObjs.Executed += (sender, e) => {
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<ushort, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
 			var collectedObjs = new Command() {
 				MenuText = "Select Collected objects"
 			};
+			collectedObjs.Executed += (sender, e) => {
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<ushort, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).CollectedObjects } }), this);
+			};
 			var newHs = new Command() {
 				MenuText = "Select All in New Heapshot"
 			};
+			newHs.Executed += (sender, e) => {
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<ushort, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
+			};
 			var oldHs = new Command() {
 				MenuText = "Select All in Old Heapshot"
+			};
+			oldHs.Executed += (sender, e) => {
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<ushort, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
 			};
 
 			return new ContextMenu(newObjs, collectedObjs, newHs, oldHs);

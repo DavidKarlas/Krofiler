@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Eto;
 
 namespace Krofiler
 {
@@ -27,10 +26,10 @@ namespace Krofiler
 		static string SettingsPath()
 		{
 			string dataFolder;
-			if (EtoEnvironment.Platform.IsWindows) {
-				dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Krofiler");
-			} else {
+			if (Environment.OSVersion.Platform == PlatformID.Unix || Environment.OSVersion.Platform == PlatformID.MacOSX) {
 				dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".krofiler");
+			} else {
+				dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Krofiler");
 			}
 
 			return Path.Combine(dataFolder, "Settings.xml");

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Eto.Forms;
+using System.Linq;
 namespace Krofiler
 {
 	public class HomeTab : StackLayout, IProfilingTab
@@ -95,7 +96,7 @@ namespace Krofiler
 			if (profilingInfo is StartProfilingProcessInfo) {
 				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath);
 			} else if (profilingInfo is StartProfilingFromFileInfo) {
-				CurrentSession = KrofilerSession.CreateFromFile(((StartProfilingFromFileInfo)profilingInfo).MlpdFilePath);
+				CurrentSession = KrofilerSession.CreateFromFile(((StartProfilingFromFileInfo)profilingInfo).KrofFilePath);
 			} else {
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
@@ -118,7 +119,7 @@ namespace Krofiler
 					Tag = hs
 				});
 				hsButton.Click += delegate {
-					InsertTab(new ObjectListTab(session, hs, hs.TypesToObjectsListMap), this);
+					InsertTab(new ObjectListTab(session, hs, hs.GroupBy(addr => addr.Value.ClassId).ToDictionary(d => d.Key, d => d.Select(o => o.Value.Address).ToList())), this);
 				};
 				commandButtonsStack.Items.Add(hsButton);
 			});

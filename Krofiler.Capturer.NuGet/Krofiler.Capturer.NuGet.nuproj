@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(NuGetAuthoringPath)\NuGet.Packaging.Authoring.props" Condition="Exists('$(NuGetAuthoringPath)\NuGet.Packaging.Authoring.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{530088E9-CC4B-4011-9114-91F536B77E4C}</ProjectGuid>
+    <Description>Used to capture .krof that contain memory heapshot from application.</Description>
+    <PackageId>Krofiler.Capturer</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Authors>davidkarlas</Authors>
+    <DevelopmentDependency>false</DevelopmentDependency>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Krofiler.Capturer</RootNamespace>
+    <UsePartialTypes>false</UsePartialTypes>
+    <AssemblyName>Krofiler.Capturer.NuGet</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <OutputPath>bin\Debug</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Krofiler.Capturer.Android\Krofiler.Capturer.Android.csproj">
+      <Project>{AAE5A8E5-B152-4D99-872E-5B59398A48FA}</Project>
+      <Name>Krofiler.Capturer.Android</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Krofiler.Capturer.iOS\Krofiler.Capturer.iOS.csproj">
+      <Project>{712210C9-8F37-4512-859B-EECA3FB4D830}</Project>
+      <Name>Krofiler.Capturer.iOS</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Krofiler.Capturer.Net45\Krofiler.Capturer.Net45.csproj">
+      <Project>{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}</Project>
+      <Name>Krofiler.Capturer.Net45</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NuGet.Build.Packaging">
+      <Version>0.1.192</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.Common.targets" />
+  <Import Project="$(NuGetAuthoringPath)\NuGet.Packaging.Authoring.targets" Condition="Exists('$(NuGetAuthoringPath)\NuGet.Packaging.Authoring.targets')" />
+</Project>

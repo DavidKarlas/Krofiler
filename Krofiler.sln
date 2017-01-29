@@ -9,6 +9,28 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Krofiler.XamMac2", "Krofile
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Krofiler", "Krofiler\Krofiler.shproj", "{4B8E6222-A207-44B9-A240-ECDEC3C8A6F3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Krofiler.PrototypingGround", "Krofiler.PrototypingGround\Krofiler.PrototypingGround.csproj", "{840B01ED-2839-4E10-8E5C-C34EF7C0A010}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Krofiler.Reader", "Krofiler.Reader\Krofiler.Reader.shproj", "{A30CD016-F759-4799-AC78-6ACDB1ED5A8D}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Krofiler.Capturer.Shared", "Krofiler.Capturer.Shared\Krofiler.Capturer.Shared.shproj", "{C298A623-5071-4DC2-841C-1CD127C9283B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Krofiler.Capturer.iOS", "Krofiler.Capturer.iOS\Krofiler.Capturer.iOS.csproj", "{712210C9-8F37-4512-859B-EECA3FB4D830}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Krofiler.Capturer.Android", "Krofiler.Capturer.Android\Krofiler.Capturer.Android.csproj", "{AAE5A8E5-B152-4D99-872E-5B59398A48FA}"
+EndProject
+Project("{5DD5E4FA-CB73-4610-85AB-557B54E96AA9}") = "Krofiler.Capturer.NuGet", "Krofiler.Capturer.NuGet\Krofiler.Capturer.NuGet.nuproj", "{530088E9-CC4B-4011-9114-91F536B77E4C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Krofiler.Capturer", "Krofiler.Capturer", "{F801FC94-3126-476E-8EE5-4EF2677DE458}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Krofiler.Platforms", "Krofiler.Platforms", "{46D10F2E-9150-480B-8DBE-0A8652F2B9D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Krofiler.Capturer.Net45", "Krofiler.Capturer.Net45\Krofiler.Capturer.Net45.csproj", "{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdeDiagnosticsExtras", "IdeDiagnosticsExtras\IdeDiagnosticsExtras.csproj", "{6AEC675C-910B-48BF-BB03-5881F142E0EF}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Krofiler.UI", "Krofiler\Krofiler.UI.shproj", "{45D7B875-6560-44E1-9D62-775F213A8ABF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +63,54 @@ Global
 		{D391AF32-87AB-40CD-8318-A93A123F009B}.Release|Any CPU.Build.0 = Release|x86
 		{D391AF32-87AB-40CD-8318-A93A123F009B}.Release|x86.ActiveCfg = Release|x86
 		{D391AF32-87AB-40CD-8318-A93A123F009B}.Release|x86.Build.0 = Release|x86
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Debug|Any CPU.Build.0 = Debug|x64
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Release|Any CPU.Build.0 = Release|Any CPU
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Debug|x86.Build.0 = Debug|Any CPU
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Release|x86.ActiveCfg = Release|Any CPU
+		{840B01ED-2839-4E10-8E5C-C34EF7C0A010}.Release|x86.Build.0 = Release|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Release|Any CPU.Build.0 = Release|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Debug|x86.Build.0 = Debug|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Release|x86.ActiveCfg = Release|Any CPU
+		{712210C9-8F37-4512-859B-EECA3FB4D830}.Release|x86.Build.0 = Release|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Debug|x86.Build.0 = Debug|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Release|x86.ActiveCfg = Release|Any CPU
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA}.Release|x86.Build.0 = Release|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Debug|x86.Build.0 = Debug|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Release|x86.ActiveCfg = Release|Any CPU
+		{530088E9-CC4B-4011-9114-91F536B77E4C}.Release|x86.Build.0 = Release|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Debug|x86.Build.0 = Debug|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Release|x86.ActiveCfg = Release|Any CPU
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1}.Release|x86.Build.0 = Release|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Debug|x86.Build.0 = Debug|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Release|x86.ActiveCfg = Release|Any CPU
+		{6AEC675C-910B-48BF-BB03-5881F142E0EF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		Policies = $0
@@ -59,5 +129,15 @@ Global
 		$2.inheritsSet = Mono
 		$2.inheritsScope = text/x-csharp
 		$2.scope = text/x-csharp
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AAE5A8E5-B152-4D99-872E-5B59398A48FA} = {F801FC94-3126-476E-8EE5-4EF2677DE458}
+		{712210C9-8F37-4512-859B-EECA3FB4D830} = {F801FC94-3126-476E-8EE5-4EF2677DE458}
+		{530088E9-CC4B-4011-9114-91F536B77E4C} = {F801FC94-3126-476E-8EE5-4EF2677DE458}
+		{C298A623-5071-4DC2-841C-1CD127C9283B} = {F801FC94-3126-476E-8EE5-4EF2677DE458}
+		{9F4331E2-374A-43E1-828F-EFBF4E08ACBD} = {46D10F2E-9150-480B-8DBE-0A8652F2B9D9}
+		{D391AF32-87AB-40CD-8318-A93A123F009B} = {46D10F2E-9150-480B-8DBE-0A8652F2B9D9}
+		{9530828B-0932-483F-BF98-7A5F81725DEA} = {46D10F2E-9150-480B-8DBE-0A8652F2B9D9}
+		{850A6AA6-CC2A-4BF0-A96D-61FE6546DCA1} = {F801FC94-3126-476E-8EE5-4EF2677DE458}
 	EndGlobalSection
 EndGlobal

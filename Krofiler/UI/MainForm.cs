@@ -3,8 +3,6 @@ using Eto.Forms;
 using Eto.Drawing;
 using System.Threading.Tasks;
 using System.Threading;
-using HeapShot.Reader;
-using MonoDevelop.Profiler;
 using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics;

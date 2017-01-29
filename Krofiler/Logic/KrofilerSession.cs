@@ -10,6 +10,7 @@ namespace Krofiler
 	{
 		public event Action<KrofilerSession, Heapshot> NewHeapshot;
 		public event Action<KrofilerSession> Finished;
+
 		public event Action<KrofilerSession, string, string> UserError;
 	}
 }

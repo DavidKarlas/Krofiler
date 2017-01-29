@@ -10,24 +10,10 @@ namespace Krofiler
 	//eventually content of this file should move elsewhere...
 	public partial class KrofilerSession
 	{
-		void PrintTypeReport(KeyValuePair<long, List<long>> p)
-		{
-			Console.WriteLine(GetTypeName(p.Key) + " " + p.Value.Count + ": " + string.Join(",", p.Value.Select(i => i.ToString())));
-		}
-
-		public RetentionPathNode CreateTreeToRoots(Heapshot hs, long objId)
-		{
-			var objInfo = hs.ObjectsInfoMap[objId];
-			var refs = objInfo.GetReferencesFrom(hs);
-			var listOfRefFromPaths = new List<RetentionPathNode>();
-			foreach (var refFrom in refs) {
-				listOfRefFromPaths.Add(CreateTreeToRoots(hs, refFrom));
-			}
-			return new RetentionPathNode() {
-				ObjId = objId,
-				RefsFrom = listOfRefFromPaths.ToArray()
-			};
-		}
+		//void PrintTypeReport(KeyValuePair<ushort, List<long>> p)
+		//{
+		//	Console.WriteLine(GetTypeName(p.Key) + " " + p.Value.Count + ": " + string.Join(",", p.Value.Select(i => i.ToString())));
+		//}
 
 		Tuple<int, StackFrame> MX(StackFrame value)
 		{
@@ -60,53 +46,9 @@ namespace Krofiler
 			}
 		}
 
-		Dictionary<FieldKey, string> fieldNamesCached = new Dictionary<FieldKey, string>();
-		List<Mono.Cecil.ModuleDefinition> cecils = new List<Mono.Cecil.ModuleDefinition>();
-
 		public string GetFieldName(long typeId, ushort fieldOffset)
 		{
-			var key = new FieldKey(typeId, fieldOffset);
-			if (fieldNamesCached.ContainsKey(key))
-				return fieldNamesCached[key];
-			var typeName = GetTypeName(typeId);
-			if (typeName.EndsWith("[]", StringComparison.Ordinal)) {
-				//Array...
-				//TODO: Check what that -16 represents and check if we are on 64bit(/8 instead of /4)
-				return fieldNamesCached[key] = $"[{(fieldOffset - 16) / 4}]";
-			}
-			if (typeName.EndsWith(">", StringComparison.Ordinal)) {
-				//TODO: Handle more then just `1...(check for commas but skip nested <>)
-				typeName = typeName.Remove(typeName.IndexOf('<'));
-				typeName += "`1";
-			}
-			if (cecils.Count < allImagesPaths.Count) {
-				for (int i = cecils.Count; i < allImagesPaths.Count; i++) {
-					if (File.Exists(allImagesPaths[i])) {
-						try {
-							cecils.Add(Mono.Cecil.ModuleDefinition.ReadModule(allImagesPaths[i]));
-						} catch { cecils.Add(null); }
-					}
-				}
-			}
-			Mono.Cecil.TypeDefinition type = null;
-			foreach (var cecil in cecils) {
-				type = cecil?.GetType(typeName);
-				if (type != null)
-					break;
-			}
-			var currentOffset = header.PtrSize == 4 ? 8 : 16;
-			if (type != null) {
-				foreach (var f in type.Fields) {
-					if (f.FieldType.IsPrimitive || f.FieldType.IsValueType)
-						continue;
-					currentOffset += header.PtrSize;
-					if (currentOffset == fieldOffset)
-						return fieldNamesCached[key] = f.Name;
-				}
-				return fieldNamesCached[key] = "<field not found>";
-			} else {
-				return fieldNamesCached[key] = "<type not found>";
-			}
+			throw new NotImplementedException();
 		}
 
 		void DoSomeCoolStuff()

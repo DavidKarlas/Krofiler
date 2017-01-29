@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{A30CD016-F759-4799-AC78-6ACDB1ED5A8D}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Krofiler.Reader</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)ClassInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HeapAlloc.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HeapEnd.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HeapMoves.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HeapObject.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HeapStart.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MoreReferences.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MyBinaryReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Reader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Root.cs" />
+  </ItemGroup>
+</Project>
