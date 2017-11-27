@@ -1,19 +1,57 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
-using HeapShot.Reader;
-using MonoDevelop.Profiler;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Mono.Profiler.Log;
 
 namespace Krofiler
 {
 	public partial class KrofilerSession
 	{
 		ProfilerRunner runner;
-		Header header;
+		LogStreamHeader header;
+
+		class NullLogEventVisitor : LogEventVisitor
+		{
+
+		}
+
+		class HeadReaderLogEventVisitor : LogEventVisitor
+		{
+			public CancellationTokenSource TokenSource = new CancellationTokenSource();
+
+			public override void VisitBefore(LogEvent ev)
+			{
+				TokenSource.Cancel();
+			}
+		}
+
+		static LogStreamHeader TryReadHeader(string mldpFilePath)
+		{
+			try {
+				using (var s = File.OpenRead(mldpFilePath))
+				using (var reader = new LogStream(s)) {
+					var visitor = new HeadReaderLogEventVisitor();
+					var processor = new LogProcessor(reader, visitor, new NullLogEventVisitor());
+
+					try {
+						processor.Process(visitor.TokenSource.Token);
+					} catch {
+					}
+					return processor.StreamHeader;
+				}
+			} catch {
+				return null;
+			}
+		}
+
+		TaskCompletionSource<bool> completionSource;
+		IProgress<float> progress;
+		CancellationToken cancellation;
+		FileStream fileStream;
 
 		public void ProcessFile()
 		{
@@ -32,86 +70,136 @@ namespace Krofiler
 				}
 				Thread.Sleep(500);
 			}
-			LogFileReader reader;
-			try {
-				reader = new LogFileReader(fileToProcess);
-			} catch {
-				goto retryOpeningLogfile;
-			}
-			header = Header.Read(reader);
+			header = TryReadHeader(fileToProcess);
 			if (header == null) {
 				goto retryOpeningLogfile;
 			}
 			TcpPort = header.Port;
-			reader.Header = header;
 			var cancellationToken = cts.Token;
-			var allEvents = new List<Event>();
-			while (!cancellationToken.IsCancellationRequested) {
-				var buffer = BufferHeader.Read(reader);
-				if (buffer == null) {
-					if (runner != null) {
-						if (runner.HasExited)
-							break;
-						Thread.Sleep(100);
-						continue;
-					} else {
-						break;
-					}
+
+			try {
+				using (fileStream = new FileStream(fileToProcess, FileMode.Open, FileAccess.Read, FileShare.Read))
+				using (var logStream = new LogStream(fileStream)) {
+					var processor = new LogProcessor(logStream, new KrofilerLogEventVisitor(this), new NullLogEventVisitor());
+					processor.Process(cancellation);
 				}
-				ParsingProgress = (double)reader.Position / (double)reader.Length;
-				reader.BufferHeader = buffer;
-				while (!reader.IsBufferEmpty) {
-#if DONT_ORDER_BY_TIME
-					var evnt = Event.Read(reader);
-					while (evnts.Count > 5)
-						evnts.Dequeue();
-					evnts.Enqueue(evnt);
-					ProcessEvent(evnt);
-#else
-					allEvents.Add(Event.Read(reader));
-#endif
-				}
+				if (cancellation.IsCancellationRequested)
+					completionSource.SetCanceled();
+				else
+					completionSource.SetResult(true);
+			} catch (Exception e) {
+				if (cancellation.IsCancellationRequested)
+					completionSource.SetCanceled();
+				else
+					completionSource.SetException(e);
 			}
 
-			var allHeapObjects = new List<HeapEvent>();
-			foreach (var ev in allEvents) {
-				var heapEvent = ev as HeapEvent;
-				if (heapEvent != null) {
-					if (heapEvent.Type == HeapEvent.EventType.Object) {
-						allHeapObjects.Add(heapEvent);
-					}
-					if (heapEvent.Type == HeapEvent.EventType.End) {
-						foreach (var item in allHeapObjects) {
-							item.Time = heapEvent.Time - 1;
-						}
-					}
-				}
-			}
-			foreach (var ev in allEvents.OrderBy(e => e.Time)) {
-				ProcessEvent(ev);
-			}
 			Finished?.Invoke(this);
-#if DEBUG
-			DoSomeCoolStuff();
-#endif
 		}
 
-		static Queue<Event> evnts = new Queue<Event>();
+		class KrofilerLogEventVisitor : LogEventVisitor
+		{
+			private KrofilerSession session;
+			Dictionary<long, AllocationEvent> allocationsTracker = new Dictionary<long, AllocationEvent>();
+
+			public KrofilerLogEventVisitor(KrofilerSession session)
+			{
+				this.session = session;
+			}
+
+			public override void Visit(AllocationEvent ev)
+			{
+				allocationsTracker[ev.ObjectPointer] = ev;
+			}
+
+			public override void Visit(GCMoveEvent ev)
+			{
+				for (int i = 0; i < ev.NewObjectPointers.Count; i++) {
+					if (allocationsTracker.TryGetValue(ev.OldObjectPointers[i], out var allocation)) {
+						allocationsTracker[ev.NewObjectPointers[i]] = allocation;
+						allocationsTracker.Remove(ev.OldObjectPointers[i]);
+					}
+				}
+				if(currentHeapshot!=null){
+					for (int i = 0; i < ev.NewObjectPointers.Count; i++) {
+						Console.WriteLine(ev.OldObjectPointers[i] + " - " + ev.NewObjectPointers[i]);
+					}
+				}
+			}
+
+			public override void Visit(HeapBeginEvent ev)
+			{
+				currentHeapshot = new Heapshot(session, ++heapshotCounter);
+			}
+
+			public override void Visit(ClassLoadEvent ev)
+			{
+				session.classIdToName[ev.ClassPointer] = ev.Name;
+			}
+
+			public override void Visit(HeapRootsEvent ev)
+			{
+				if (currentHeapshot != null) {
+					foreach (var root in ev.Roots) {
+						currentHeapshot.Roots[root.ObjectPointer] = root.Attributes.ToString();
+						Console.Write(root.ObjectPointer + ",");
+					}
+					Console.WriteLine();
+				}
+			}
+
+			public override void Visit(HeapEndEvent ev)
+			{
+				var deadAllocations = new HashSet<long>();
+				foreach (var key in allocationsTracker.Keys)
+					if (!currentHeapshot.ObjectsInfoMap.ContainsKey(key))
+						deadAllocations.Add(key);
+				foreach (var key in deadAllocations) {
+					allocationsTracker.Remove(key);
+				}
+
+				session.NewHeapshot?.Invoke(session, currentHeapshot);
+				currentHeapshot = null;
+			}
+
+			int heapshotCounter = 0;
+			Heapshot currentHeapshot;
+
+			public override void Visit(HeapObjectEvent ev)
+			{
+				if (ev.ObjectSize == 0) {
+					var existingObj = currentHeapshot.ObjectsInfoMap[ev.ObjectPointer];
+					//Todo: optimise to not use linq?
+					existingObj.ReferencesTo = existingObj.ReferencesTo.Concat(ev.References.Select(r => r.ObjectPointer)).ToArray();
+					existingObj.ReferencesAt = existingObj.ReferencesAt.Concat(ev.References.Select(r => (ushort)r.Offset)).ToArray();
+					return;
+				}
+
+				var obj = new ObjectInfo();
+				obj.Allocation = allocationsTracker[ev.ObjectPointer];
+				obj.ObjAddr = ev.ObjectPointer;
+				obj.TypeId = ev.ClassPointer;
+				obj.ReferencesTo = ev.References.Select(r => r.ObjectPointer).ToArray();
+				obj.ReferencesAt = ev.References.Select(r => (ushort)r.Offset).ToArray();
+				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(ev.ClassPointer))
+					currentHeapshot.TypesToObjectsListMap[ev.ClassPointer] = new List<ObjectInfo>();
+				currentHeapshot.TypesToObjectsListMap[ev.ClassPointer].Add(obj);
+
+				currentHeapshot.ObjectsInfoMap.Add(ev.ObjectPointer, obj);
+			}
+		}
 
 		CancellationTokenSource cts = new CancellationTokenSource();
 		Thread parsingThread;
-		internal void StartParsing()
+		internal Task StartParsing()
 		{
+			if (completionSource != null)
+				return completionSource.Task;
+			completionSource = new TaskCompletionSource<bool>();
 			parsingThread = new Thread(new ThreadStart(ProcessFile));
 			parsingThread.Start();
+			return completionSource.Task;
 		}
-
-		public class AllocStruct
-		{
-			public StackFrame StackFrame;
-			public long Object;
-		}
-
 
 		public string GetTypeName(long id)
 		{
@@ -125,7 +213,6 @@ namespace Krofiler
 
 		Heapshot currentHeapshot;
 		List<Heapshot> heapshots = new List<Heapshot>();
-		public List<GcMoveElement> allMoves = new List<GcMoveElement>();
 
 		public Dictionary<long, string> methodsNames = new Dictionary<long, string>();
 		//int maxDepth = 0;
@@ -152,101 +239,20 @@ namespace Krofiler
 		}
 
 		Dictionary<long, string> classIdToName = new Dictionary<long, string>();
-		public Dictionary<long, Tuple<uint, StackFrame, bool>> allocs = new Dictionary<long, Tuple<uint, StackFrame, bool>>();
-		public Dictionary<long, Tuple<HeapEvent.RootType, ulong>> roots = new Dictionary<long, Tuple<HeapEvent.RootType, ulong>>();
-		public double ParsingProgress { get; private set; }
-		List<string> allImagesPaths = new List<string>();
-
-		void ProcessEvent(Event ev)
-		{
-			var allocEvent = ev as AllocEvent;
-			if (allocEvent != null) {
-				allocs[allocEvent.Obj] = Tuple.Create((uint)(ev.Time / 1000), GetStackFrame(allocEvent.Backtrace), false);
-				//Console.WriteLine($"A:{allocEvent.Obj} {Helper.Time(ev)}");
-				return;
-			}
-			var gcEvent = ev as MoveGcEvent;
-			if (gcEvent != null) {
-				for (var i = 0; i < gcEvent.ObjAddr.Length; i += 2) {
-					var f = gcEvent.ObjAddr[i];
-					var t = gcEvent.ObjAddr[i + 1];
-					//Console.WriteLine($"M:{f}->{t} {Helper.Time(ev)}");
-					if (allocs.ContainsKey(f))
-						allocs[t] = allocs[f];
-					allMoves.Add(new GcMoveElement() {
-						From = f,
-						To = t
-					});
+		public double ParsingProgress {
+			get {
+				if (completionSource?.Task?.IsCompleted ?? false)
+					return 100;
+				try {
+					if ((fileStream?.Length ?? 0) == 0)
+						return 0;
+					return (double)fileStream.Position / fileStream.Length;
+				} catch {
+					return 0;
 				}
-				//GC Move events that came within 1 second of last heapshot
-				//consider them as they came before heapshot(hacky workaround runtime problem)
-				if (heapshots.Any() && gcEvent.Time - 1000000000 < heapshots.Last().endTime)
-					heapshots.Last().MovesPosition = allMoves.Count;
-				return;
-			}
-			var methodEvent = ev as MethodEvent;
-			if (methodEvent != null) {
-				if (methodEvent.Type == MethodEvent.MethodType.Jit) {
-					methodsNames.Add(methodEvent.Method, methodEvent.Name);
-				}
-				return;
-			}
-			var typeEvent = ev as MetadataEvent;
-			if (typeEvent != null) {
-				switch (typeEvent.MType) {
-					case MetadataEvent.MetaDataType.Class:
-						classIdToName[typeEvent.Pointer] = typeEvent.Name;
-						break;
-					case MetadataEvent.MetaDataType.Image:
-						allImagesPaths.Add(typeEvent.Name);
-						break;
-					case MetadataEvent.MetaDataType.Assembly:
-						break;
-					case MetadataEvent.MetaDataType.Domain:
-						break;
-					case MetadataEvent.MetaDataType.Thread:
-						break;
-					case MetadataEvent.MetaDataType.Context:
-						break;
-					default:
-						break;
-				}
-				return;
-			}
-			var heapEvent = ev as HeapEvent;
-			if (heapEvent != null) {
-				switch (heapEvent.Type) {
-					case HeapEvent.EventType.Start:
-						Console.WriteLine("Start:" + heapshots.Count);
-						currentHeapshot = new Heapshot(this, "Heap " + (heapshots.Count + 1));
-						currentHeapshot.startTime = heapEvent.Time;
-						break;
-					case HeapEvent.EventType.End:
-						Console.WriteLine("End:" + heapshots.Count);
-						currentHeapshot.endTime = heapEvent.Time;
-						heapshots.Add(currentHeapshot);
-						NewHeapshot?.Invoke(this, currentHeapshot);
-						currentHeapshot = null;
-						break;
-					case HeapEvent.EventType.Root:
-						for (int i = 0; i < heapEvent.RootRefs.Length; i++) {
-							Tuple<uint, StackFrame, bool> val;
-							if (allocs.TryGetValue(heapEvent.RootRefs[i], out val))
-								allocs[heapEvent.RootRefs[i]] = Tuple.Create(val.Item1, val.Item2, true);
-							else
-								Console.WriteLine("oh joj");
-							//roots[heapEvent.RootRefs[i]] = new Tuple<HeapEvent.RootType, ulong>(heapEvent.RootRefTypes[i], heapEvent.RootRefExtraInfos[i]);
-						}
-						break;
-					case HeapEvent.EventType.Object:
-						currentHeapshot.AddObject(heapEvent);
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-				return;
 			}
 		}
+		List<string> allImagesPaths = new List<string>();
 	}
 }
 

@@ -37,27 +37,28 @@ namespace Krofiler
 		{
 			public string TypeName;
 			public long TypeId;
-			public List<long> NewObjects;
-			public List<long> CollectedObjects;
-			public List<long> NewHsObjects;
-			public List<long> OldHsObjects;
+			public List<ObjectInfo> NewObjects;
+			public List<ObjectInfo> CollectedObjects;
+			public List<ObjectInfo> NewHsObjects;
+			public List<ObjectInfo> OldHsObjects;
 		}
 		TextBox filterTypesTextBox;
-
-		static List<long> EmptyList = new List<long>();
+		
+		static List<ObjectInfo> EmptyList = new List<ObjectInfo>();
 
 		public CompareHeapshotsTab(KrofilerSession session, Heapshot hs1, Heapshot hs2)
 		{
 			this.session = session;
-			if (hs2.endTime > hs1.endTime) {
+			if (hs2.Id > hs1.Id) {
 				newHeapshot = hs2;
 				oldHeapshot = hs1;
 			} else {
 				newHeapshot = hs1;
 				oldHeapshot = hs2;
 			}
-			var newObjects = Heapshot.NewObjects(oldHeapshot, newHeapshot);
-			var collectedObjects = Heapshot.DeletedObjects(oldHeapshot, newHeapshot);
+			var diff = new DiffHeap(oldHeapshot, newHeapshot);
+			var newObjects = diff.NewObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
+			var deleted = diff.DeletedObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
 			var allObjectsInOldHs = oldHeapshot.TypesToObjectsListMap;
 			var allObjectsInNewHs = newHeapshot.TypesToObjectsListMap;
 			var hashTableAllTypes = new HashSet<long>();
@@ -70,7 +71,7 @@ namespace Krofiler
 					TypeId = typeId,
 					TypeName = session.GetTypeName(typeId),
 					NewObjects = newObjects.ContainsKey(typeId) ? newObjects[typeId] : EmptyList,
-					CollectedObjects = collectedObjects.ContainsKey(typeId) ? collectedObjects[typeId] : EmptyList,
+					CollectedObjects = deleted.ContainsKey(typeId) ? deleted[typeId] : EmptyList,
 					OldHsObjects = allObjectsInOldHs.ContainsKey(typeId) ? allObjectsInOldHs[typeId] : EmptyList,
 					NewHsObjects = allObjectsInNewHs.ContainsKey(typeId) ? allObjectsInNewHs[typeId] : EmptyList
 				});
@@ -131,7 +132,7 @@ namespace Krofiler
 				MenuText = "Select New objects"
 			};
 			newObjs.Executed += (sender, e) => {
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
 			var collectedObjs = new Command() {
 				MenuText = "Select Collected objects"

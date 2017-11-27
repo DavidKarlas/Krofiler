@@ -9,15 +9,14 @@
     <RootNamespace>Krofiler.XamMac2</RootNamespace>
     <MonoMacResourcePrefix>Resources</MonoMacResourcePrefix>
     <AssemblyName>Krofiler.XamMac2</AssemblyName>
-    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
-    <TargetFrameworkIdentifier>Xamarin.Mac</TargetFrameworkIdentifier>
+    <UseXamMacFullFramework>true</UseXamMacFullFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug</OutputPath>
-    <DefineConstants>__UNIFIED__;DEBUG;DONT_ORDER_BY_TIME</DefineConstants>
+    <DefineConstants>__MACOS__;__UNIFIED__;DEBUG;DONT_ORDER_BY_TIME</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
@@ -34,6 +33,7 @@
     <CodeSignEntitlements></CodeSignEntitlements>
     <CodeSignResourceRules></CodeSignResourceRules>
     <NoStdLib>false</NoStdLib>
+    <AOTMode>None</AOTMode>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -52,6 +52,7 @@
     <EnablePackageSigning>false</EnablePackageSigning>
     <HttpClientHandler>HttpClientHandler</HttpClientHandler>
     <NoStdLib>false</NoStdLib>
+    <AOTMode>None</AOTMode>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -76,6 +77,21 @@
       <HintPath>..\packages\Mono.Cecil.0.9.6.1\lib\net45\Mono.Cecil.Rocks.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml" />
+    <Reference Include="Mono.Profiler.Log">
+      <HintPath>..\..\..\..\..\Library\Frameworks\Mono.framework\Versions\5.9.0\lib\mono\gac\Mono.Profiler.Log\4.0.0.0__0738eb9f132ed756\Mono.Profiler.Log.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Data">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Graphviz">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Graphviz.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Serialization">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Serialization.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
@@ -88,6 +104,7 @@
     <None Include="Info.plist" />
     <None Include="packages.config" />
   </ItemGroup>
+  <Import Project="..\Krofiler.UI\Krofiler.UI.projitems" Label="Shared" Condition="Exists('..\Krofiler.UI\Krofiler.UI.projitems')" />
   <Import Project="..\Krofiler\Krofiler.projitems" Label="Shared" Condition="Exists('..\Krofiler\Krofiler.projitems')" />
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\Mac\Xamarin.Mac.CSharp.targets" />
 </Project>

@@ -15,11 +15,10 @@ namespace Krofiler
 		TextBox filterTypesTextBox;
 		FilterCollection<Tuple<long, string, int>> typesCollection = new FilterCollection<Tuple<long, string, int>>();
 		string typeNameFilter;
-		ObservableCollection<ObjectInfo> objectsCollection = new ObservableCollection<ObjectInfo>();
 		ObjectDetailsPanel objectPanel;
-		readonly Dictionary<long, List<long>> typesToObjectsListMap;
+		readonly Dictionary<long, List<ObjectInfo>> typesToObjectsListMap;
 
-		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<long>> typesToObjectsListMap)
+		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<ObjectInfo>> typesToObjectsListMap)
 		{
 			this.typesToObjectsListMap = typesToObjectsListMap;
 			this.session = session;
@@ -32,11 +31,12 @@ namespace Krofiler
 			var filterAndTypesStackLayout = new StackLayout();
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
-
+			filterAndTypesStackLayout.Width = (int)Screen.PrimaryScreen.Bounds.Width / 2;
 			this.Items.Add(new StackLayoutItem(filterAndTypesStackLayout, VerticalAlignment.Stretch));
 			CreateObjectsView();
 			this.Items.Add(new StackLayoutItem(objectsGrid, VerticalAlignment.Stretch));
 			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
+			objectPanel.InsertTab += (a, b) => InsertTab?.Invoke(a, b ?? this);
 			this.Items.Add(new StackLayoutItem(objectPanel, VerticalAlignment.Stretch, true));
 		}
 
@@ -95,31 +95,24 @@ namespace Krofiler
 		void Grid_SelectedRowsChanged(object sender, EventArgs e)
 		{
 			var selectedItem = typesGrid.SelectedItem as Tuple<long, string, int>;
-			objectsCollection.Clear();
 			if (selectedItem == null) {
 				return;
 			}
-			objectsGrid.DataStore = null;
-			foreach (var id in typesToObjectsListMap[selectedItem.Item1]) {
-				objectsCollection.Add(new ObjectInfo(id, session.allocs.ContainsKey(id) ? TimeSpan.FromTicks(session.allocs[id].Item1 * 10) : TimeSpan.FromTicks(0)));
-			}
-			objectsGrid.DataStore = objectsCollection;
+			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1];
 		}
 
 		void CreateObjectsView()
 		{
-			objectsGrid = new GridView() {
-				DataStore = objectsCollection
-			};
+			objectsGrid = new GridView();
 			objectsGrid.AllowMultipleSelection = false;
 
 
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Id.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.ObjAddr.ToString()) },
 				HeaderText = "Object Id"
 			});
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Time.ToString("G")) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Allocation.Timestamp.ToString()) },
 				HeaderText = "Time"
 			});
 
@@ -132,19 +125,7 @@ namespace Krofiler
 			if (selectedItem == null) {
 				return;
 			}
-			objectPanel.ObjectId = selectedItem.Id;
-		}
-
-		class ObjectInfo
-		{
-			public readonly long Id;
-			public readonly TimeSpan Time;
-
-			public ObjectInfo(long id, TimeSpan time)
-			{
-				this.Id = id;
-				this.Time = time;
-			}
+			objectPanel.Object = selectedItem;
 		}
 	}
 }

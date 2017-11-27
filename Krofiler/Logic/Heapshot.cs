@@ -1,111 +1,177 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using MonoDevelop.Profiler;
+using QuickGraph;
+using QuickGraph.Algorithms.Observers;
+using QuickGraph.Algorithms.Search;
 
 namespace Krofiler
 {
-
-	public class Heapshot
+	public class ReferenceEdge : IEdge<long>
 	{
-		ulong totalSize = 0;
-		long totalObjects = 0;
-		public ulong startTime;
-		public ulong endTime;
-		public int MovesPosition;
-		readonly KrofilerSession session;
-
-		public Heapshot(KrofilerSession session, string name)
+		public long Source { get; set; }
+		public long Target { get; set; }
+		public ReferenceEdge(long s, long t)
 		{
-			this.session = session;
-			this.Name = name;
-			MovesPosition = session.allMoves.Count;
-		}
-
-
-		public Dictionary<long, List<long>> TypesToObjectsListMap = new Dictionary<long, List<long>>();
-		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
-
-		public string Name { get; set; }
-
-		public void AddObject(HeapEvent ev)
-		{
-			var typeId = ev.Class;
-			var objAddr = ev.Object;
-			//Console.WriteLine(Name + " " + objAddr);
-			//if (ObjectsInfoMap.ContainsKey(objAddr)) {
-			//	if (ObjectsInfoMap[objAddr].TypeId != typeId)
-			//		throw new Exception("Type of duplicate object in heap mismatch.");
-			//	return;
-			//}
-
-			foreach (var o in ev.ObjectRefs) {
-				ObjectInfo v;
-				if (ObjectsInfoMap.TryGetValue(o, out v))
-					v.ReferencesFrom.Add(objAddr);
-				else
-					Console.WriteLine($"Failed to do RF:{objAddr}:{o}");
-			}
-
-			totalSize += ev.Size;
-			totalObjects++;
-			if (!TypesToObjectsListMap.ContainsKey(typeId))
-				TypesToObjectsListMap[typeId] = new List<long>();
-			TypesToObjectsListMap[typeId].Add(objAddr);
-			ObjectsInfoMap[objAddr] = new ObjectInfo() {
-				ObjAddr = objAddr,
-				TypeId = typeId,
-				ReferencesAt = ev.RelOffset,
-				ReferencesTo = ev.ObjectRefs,
-				StackFrame = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item2 : null,
-				IsRoot = session.allocs.ContainsKey(objAddr) ? session.allocs[objAddr].Item3 : false
-			};
-		}
-
-		internal static Dictionary<long, List<long>> NewObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
-		{
-			var result = new Dictionary<long, List<long>>();
-			var oldHeapShotWithMoves = (Heapshot)oldHeapShot.MemberwiseClone();
-			for (int i = oldHeapShotWithMoves.MovesPosition; i < newHeapShot.MovesPosition; i++) {
-				oldHeapShotWithMoves.ChangeAddress(newHeapShot.session.allMoves[i].From, newHeapShot.session.allMoves[i].To);
-			}
-			foreach (var t in newHeapShot.TypesToObjectsListMap) {
-				if (oldHeapShotWithMoves.TypesToObjectsListMap.ContainsKey(t.Key)) {
-					var list = t.Value.Except(oldHeapShotWithMoves.TypesToObjectsListMap[t.Key]).ToList();
-					if (list.Count == 0) {
-						continue;
-					} else {
-						result.Add(t.Key, list);
-					}
-				} else {
-					result.Add(t.Key, t.Value);
-				}
-			}
-			return result;
-		}
-
-		internal static Dictionary<long, List<long>> DeletedObjects(Heapshot oldHeapShot, Heapshot newHeapShot)
-		{
-			return NewObjects(newHeapShot, oldHeapShot);
-		}
-
-		internal void ChangeAddress(long oldAddress, long newAddress)
-		{
-			if (!ObjectsInfoMap.ContainsKey(oldAddress))
-				return;//I guess this allocation happened before our HS
-			var ttt = ObjectsInfoMap[oldAddress];
-			var typeMap = TypesToObjectsListMap[ttt.TypeId];
-			typeMap.Remove(oldAddress);
-			typeMap.Add(newAddress);
-			ObjectsInfoMap.Remove(oldAddress);
-			ObjectsInfoMap.Add(newAddress, ttt);
-		}
-
-		internal void AddRootRef(long v1, HeapEvent.RootType rootType, ulong v2)
-		{
-
+			Source = s;
+			Target = t;
 		}
 	}
 
-}
+	public class Heapshot : IVertexListGraph<long, ReferenceEdge>
+	{
+		public Dictionary<long, List<ObjectInfo>> TypesToObjectsListMap = new Dictionary<long, List<ObjectInfo>>();
+		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
+		public Dictionary<long, string> Roots = new Dictionary<long, string>();
 
+		public string Name {
+			get {
+				return Id.ToString();
+			}
+		}
+
+		public KrofilerSession Session { get; }
+		public int Id { get; }
+
+		public Heapshot(KrofilerSession session, int id)
+		{
+			Id = id;
+			Session = session;
+		}
+
+		void BuildReferencesFrom()
+		{
+			var listOfReferences = new List<long>();
+			foreach (var obj in ObjectsInfoMap.Values) {
+				foreach (var r in obj.ReferencesTo)
+					ObjectsInfoMap[r].ReferencesFrom.Add(obj.ObjAddr);
+			}
+		}
+
+
+		IEnumerable<ReferenceEdge> cachedResult;
+		long cachedAddr;
+		bool referencesFromBuilt=false;
+		public IEnumerable<ReferenceEdge> GetShortestPathToRoot(long addr)
+		{
+			if (cachedAddr == addr && cachedResult != null)
+				return cachedResult;
+			if (Roots.ContainsKey(addr)) {
+				cachedResult = new List<ReferenceEdge>();
+				cachedAddr = addr;
+				return cachedResult;
+			}
+			if (!referencesFromBuilt) {
+				referencesFromBuilt = true;
+				var sw = Stopwatch.StartNew();
+				BuildReferencesFrom();
+				sw.Stop();
+			}
+			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge>(this);
+			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge>();
+			vis.Attach(bfsa);
+			long foundRoot = 0;
+			//possible optimisation to find only shortest path, worthiness is questionable
+			bfsa.ExamineVertex += (vertex) => {
+				if (Roots.ContainsKey(vertex)) {
+					bfsa.Services.CancelManager.Cancel();
+					foundRoot = vertex;
+				}
+			};
+			bfsa.Compute(addr);
+
+			if (!vis.TryGetPath(foundRoot, out var path)) {
+				path = new List<ReferenceEdge>();
+			}
+			//Find shortest path
+			cachedResult = path;
+			cachedAddr = addr;
+			return cachedResult;
+		}
+
+		#region QuickGraph interface
+		public bool AllowParallelEdges {
+			get {
+				return false;
+			}
+		}
+
+		public bool IsDirected {
+			get {
+				return true;
+			}
+		}
+
+		public bool IsVerticesEmpty {
+			get {
+				return ObjectsInfoMap.Count == 0;
+			}
+		}
+
+		public int VertexCount {
+			get {
+				return ObjectsInfoMap.Count;
+			}
+		}
+
+		public IEnumerable<long> Vertices {
+			get {
+				return ObjectsInfoMap.Keys;
+			}
+		}
+
+		public bool ContainsEdge(long source, long target)
+		{
+			return ObjectsInfoMap[source].ReferencesFrom.Contains(target);
+		}
+
+		public bool ContainsVertex(long vertex)
+		{
+			return ObjectsInfoMap.ContainsKey(vertex);
+		}
+
+		public bool IsOutEdgesEmpty(long v)
+		{
+			return ObjectsInfoMap[v].ReferencesFrom.Count == 0;
+		}
+
+		public int OutDegree(long v)
+		{
+			return ObjectsInfoMap[v].ReferencesFrom.Count;
+		}
+
+		public ReferenceEdge OutEdge(long v, int index)
+		{
+			return new ReferenceEdge(v, ObjectsInfoMap[v].ReferencesFrom[index]);
+		}
+
+		public IEnumerable<ReferenceEdge> OutEdges(long v)
+		{
+			foreach (var r in ObjectsInfoMap[v].ReferencesFrom) {
+				yield return new ReferenceEdge(v, r);
+			}
+		}
+
+		public bool TryGetEdge(long source, long target, out ReferenceEdge edge)
+		{
+			if (ObjectsInfoMap[source].ReferencesFrom.Contains(target)) {
+				edge = default(ReferenceEdge);
+				return false;
+			}
+			edge = new ReferenceEdge(source, target);
+			return true;
+		}
+
+		public bool TryGetEdges(long source, long target, out IEnumerable<ReferenceEdge> edges)
+		{
+			throw new Exception("This graph doesn't allow Parallel Edges");
+		}
+
+		public bool TryGetOutEdges(long v, out IEnumerable<ReferenceEdge> edges)
+		{
+			throw new NotImplementedException();
+		}
+		#endregion
+	}
+}

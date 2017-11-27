@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{3042A285-9A55-42F5-A665-9243BDDACCA8}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Krofiler.UI</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Controls\ListBoxWithTitle.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\MainForm.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\HomePage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingPage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\CompareHeapshots.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\HomeTab.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectDetailsPanel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectsListTab.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\RetentionGraph.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)UI\" />
+  </ItemGroup>
+</Project>
