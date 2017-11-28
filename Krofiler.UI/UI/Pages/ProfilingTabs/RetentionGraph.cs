@@ -28,31 +28,31 @@ namespace Krofiler
 
 		protected override void OnPaint(PaintEventArgs e)
 		{
-			int depth = 0;
-			if (ObjectId.HasValue) {
-				bool first = true;
-				var path = heapshot.GetShortestPathToRoot(ObjectId.Value).ToArray();
-				long rootId;
-				if (path.Length == 0) {
-					DrawRow(e, ObjectId.Value, 0);
-					rootId = ObjectId.Value;
-					depth++;
-				} else {
-					foreach (var item in path) {
-						if (first) {
-							DrawRow(e, item.Source, depth++);
-							first = false;
-						}
-						DrawConnection(e, session.GetFieldName(item.Source, 0), depth);
-						DrawRow(e, item.Target, depth++);
-					}
-					rootId = path.Last().Target;
-				}
-				if (heapshot.Roots.TryGetValue(rootId, out var root) && !string.IsNullOrEmpty(root)) {
-					DrawConnection(e, root, depth);
-				}
-			}
-			base.OnPaint(e);
+			//int depth = 0;
+			//if (ObjectId.HasValue) {
+			//	bool first = true;
+			//	var path = heapshot.GetTop5PathsToRoots(ObjectId.Value).ToArray();
+			//	long rootId;
+			//	if (path.Length == 0) {
+			//		DrawRow(e, ObjectId.Value, 0);
+			//		rootId = ObjectId.Value;
+			//		depth++;
+			//	} else {
+			//		foreach (var item in path) {
+			//			if (first) {
+			//				DrawRow(e, item.Source, depth++);
+			//				first = false;
+			//			}
+			//			DrawConnection(e, session.GetFieldName(item.Source, 0), depth);
+			//			DrawRow(e, item.Target, depth++);
+			//		}
+			//		rootId = path.Last().Target;
+			//	}
+			//	if (heapshot.Roots.TryGetValue(rootId, out var root) && !string.IsNullOrEmpty(root)) {
+			//		DrawConnection(e, root, depth);
+			//	}
+			//}
+			//base.OnPaint(e);
 		}
 
 		void DrawConnection(PaintEventArgs e, string fieldName, int depth)

@@ -11,7 +11,7 @@ namespace Prototype
 			var session = KrofilerSession.CreateFromFile("/Users/davidkarlas/Documents/3SnapshotsWithOpeningAndCLosingProject.mlpd");
 			session.NewHeapshot += (s, e) => {
 				var hs = e;
-				hs.GetShortestPathToRoot(hs.ObjectsInfoMap.Keys.First());
+				hs.GetTop5PathsToRoots(hs.ObjectsInfoMap.Keys.First());
 				Console.WriteLine (new string ('=', 30));
 				Console.WriteLine ("Hs:" + e.Name);
 				foreach (var obj in hs.ObjectsInfoMap.Values) {

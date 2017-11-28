@@ -50,43 +50,50 @@ namespace Krofiler
 		}
 
 
-		IEnumerable<ReferenceEdge> cachedResult;
+		List<IEnumerable<ReferenceEdge>> cachedResult;
 		long cachedAddr;
 		bool referencesFromBuilt=false;
-		public IEnumerable<ReferenceEdge> GetShortestPathToRoot(long addr)
+		public List<IEnumerable<ReferenceEdge>> GetTop5PathsToRoots (long addr)
 		{
 			if (cachedAddr == addr && cachedResult != null)
 				return cachedResult;
-			if (Roots.ContainsKey(addr)) {
-				cachedResult = new List<ReferenceEdge>();
-				cachedAddr = addr;
+			cachedResult = new List<IEnumerable<ReferenceEdge>> ();
+			cachedAddr = addr;
+			if (Roots.ContainsKey (addr))
+			{
 				return cachedResult;
 			}
-			if (!referencesFromBuilt) {
+			if (!referencesFromBuilt)
+			{
 				referencesFromBuilt = true;
-				var sw = Stopwatch.StartNew();
-				BuildReferencesFrom();
-				sw.Stop();
+				var sw = Stopwatch.StartNew ();
+				BuildReferencesFrom ();
+				sw.Stop ();
 			}
-			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge>(this);
-			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge>();
-			vis.Attach(bfsa);
-			long foundRoot = 0;
-			//possible optimisation to find only shortest path, worthiness is questionable
-			bfsa.ExamineVertex += (vertex) => {
-				if (Roots.ContainsKey(vertex)) {
-					bfsa.Services.CancelManager.Cancel();
-					foundRoot = vertex;
+			var result = new List<List<ReferenceEdge>> ();
+			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge> (this);
+			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge> ();
+			vis.Attach (bfsa);
+			var visitedRoots = new HashSet<long> ();
+			bfsa.ExamineVertex += (vertex) =>
+			{
+				if (Roots.ContainsKey (vertex))
+				{
+					visitedRoots.Add (vertex);
+					if (visitedRoots.Count == 5)
+					{
+						bfsa.Services.CancelManager.Cancel ();
+					}
 				}
 			};
-			bfsa.Compute(addr);
-
-			if (!vis.TryGetPath(foundRoot, out var path)) {
-				path = new List<ReferenceEdge>();
+			bfsa.Compute (addr);
+			foreach (var root in visitedRoots)
+			{
+				if (vis.TryGetPath (root, out var path))
+				{
+					cachedResult.Add (path);
+				}
 			}
-			//Find shortest path
-			cachedResult = path;
-			cachedAddr = addr;
 			return cachedResult;
 		}
 
