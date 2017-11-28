@@ -5,19 +5,11 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mono.Profiler.Log {
+namespace Mono.Profiler.Log
+{
 
-	public sealed class AppDomainLoadEvent : LogEvent {
-
-		public long AppDomainId { get; internal set; }
-
-		internal override void Accept (LogEventVisitor visitor)
-		{
-			visitor.Visit (this);
-		}
-	}
-
-	public sealed class AppDomainUnloadEvent : LogEvent {
+	public sealed class AppDomainLoadEvent : LogEvent
+	{
 
 		public long AppDomainId { get; internal set; }
 
@@ -27,7 +19,19 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class AppDomainNameEvent : LogEvent {
+	public sealed class AppDomainUnloadEvent : LogEvent
+	{
+
+		public long AppDomainId { get; internal set; }
+
+		internal override void Accept (LogEventVisitor visitor)
+		{
+			visitor.Visit (this);
+		}
+	}
+
+	public sealed class AppDomainNameEvent : LogEvent
+	{
 
 		public long AppDomainId { get; internal set; }
 
@@ -39,7 +43,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ContextLoadEvent : LogEvent {
+	public sealed class ContextLoadEvent : LogEvent
+	{
 
 		public long ContextId { get; internal set; }
 
@@ -51,7 +56,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ContextUnloadEvent : LogEvent {
+	public sealed class ContextUnloadEvent : LogEvent
+	{
 
 		public long ContextId { get; internal set; }
 
@@ -63,7 +69,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ThreadStartEvent : LogEvent {
+	public sealed class ThreadStartEvent : LogEvent
+	{
 
 		public long ThreadId { get; internal set; }
 
@@ -73,7 +80,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ThreadEndEvent : LogEvent {
+	public sealed class ThreadEndEvent : LogEvent
+	{
 
 		public long ThreadId { get; internal set; }
 
@@ -83,7 +91,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ThreadNameEvent : LogEvent {
+	public sealed class ThreadNameEvent : LogEvent
+	{
 
 		public long ThreadId { get; internal set; }
 
@@ -95,7 +104,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ImageLoadEvent : LogEvent {
+	public sealed class ImageLoadEvent : LogEvent
+	{
 
 		public long ImagePointer { get; internal set; }
 
@@ -107,7 +117,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ImageUnloadEvent : LogEvent {
+	public sealed class ImageUnloadEvent : LogEvent
+	{
 
 		public long ImagePointer { get; internal set; }
 
@@ -119,7 +130,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class AssemblyLoadEvent : LogEvent {
+	public sealed class AssemblyLoadEvent : LogEvent
+	{
 
 		public long AssemblyPointer { get; internal set; }
 
@@ -133,7 +145,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class AssemblyUnloadEvent : LogEvent {
+	public sealed class AssemblyUnloadEvent : LogEvent
+	{
 
 		public long AssemblyPointer { get; internal set; }
 
@@ -147,7 +160,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ClassLoadEvent : LogEvent {
+	public sealed class ClassLoadEvent : LogEvent
+	{
 
 		public long ClassPointer { get; internal set; }
 
@@ -161,7 +175,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class JitEvent : LogEvent {
+	public sealed class JitEvent : LogEvent
+	{
 
 		public long MethodPointer { get; internal set; }
 
@@ -177,7 +192,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class JitHelperEvent : LogEvent {
+	public sealed class JitHelperEvent : LogEvent
+	{
 
 		public LogJitHelper Type { get; internal set; }
 
@@ -193,7 +209,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class AllocationEvent : LogEvent {
+	public sealed class AllocationEvent : LogEvent
+	{
 
 		public long ClassPointer { get; internal set; }
 
@@ -209,7 +226,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class HeapBeginEvent : LogEvent {
+	public sealed class HeapBeginEvent : LogEvent
+	{
 
 		internal override void Accept (LogEventVisitor visitor)
 		{
@@ -217,7 +235,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class HeapEndEvent : LogEvent {
+	public sealed class HeapEndEvent : LogEvent
+	{
 
 		internal override void Accept (LogEventVisitor visitor)
 		{
@@ -225,9 +244,11 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class HeapObjectEvent : LogEvent {
+	public sealed class HeapObjectEvent : LogEvent
+	{
 
-		public struct HeapObjectReference {
+		public struct HeapObjectReference
+		{
 
 			public long Offset { get; internal set; }
 
@@ -248,15 +269,19 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class HeapRootsEvent : LogEvent {
+	public sealed class HeapRootsEvent : LogEvent
+	{
 
-		public struct HeapRoot {
+		public struct HeapRoot
+		{
 
 			public long ObjectPointer { get; internal set; }
 
 			public LogHeapRootAttributes Attributes { get; internal set; }
 
 			public long ExtraInfo { get; internal set; }
+
+			public long AddressPointer { get; internal set; }
 		}
 
 		public long MaxGenerationCollectionCount { get; internal set; }
@@ -269,7 +294,32 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCEvent : LogEvent {
+	public sealed class HeapRootRegisterEvent : LogEvent
+	{
+		public long Start { get; internal set; }
+		public long Size { get; internal set; }
+		public LogHeapRootSource Kind { get; internal set; }
+		public long Key { get; internal set; }
+		public string Message { get; internal set; }
+
+		internal override void Accept (LogEventVisitor visitor)
+		{
+			visitor.Visit (this);
+		}
+	}
+
+	public sealed class HeapRootUnregisterEvent : LogEvent
+	{
+		public long Start { get; internal set; }
+
+		internal override void Accept (LogEventVisitor visitor)
+		{
+			visitor.Visit (this);
+		}
+	}
+
+	public sealed class GCEvent : LogEvent
+	{
 
 		public LogGCEvent Type { get; internal set; }
 
@@ -281,7 +331,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCResizeEvent : LogEvent {
+	public sealed class GCResizeEvent : LogEvent
+	{
 
 		public long NewSize { get; internal set; }
 
@@ -291,7 +342,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCMoveEvent : LogEvent {
+	public sealed class GCMoveEvent : LogEvent
+	{
 
 		public IReadOnlyList<long> OldObjectPointers { get; internal set; }
 
@@ -303,7 +355,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCHandleCreationEvent : LogEvent {
+	public sealed class GCHandleCreationEvent : LogEvent
+	{
 
 		public LogGCHandleType Type { get; internal set; }
 
@@ -319,7 +372,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCHandleDeletionEvent : LogEvent {
+	public sealed class GCHandleDeletionEvent : LogEvent
+	{
 
 		public LogGCHandleType Type { get; internal set; }
 
@@ -333,7 +387,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCFinalizeBeginEvent : LogEvent {
+	public sealed class GCFinalizeBeginEvent : LogEvent
+	{
 
 		internal override void Accept (LogEventVisitor visitor)
 		{
@@ -341,7 +396,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCFinalizeEndEvent : LogEvent {
+	public sealed class GCFinalizeEndEvent : LogEvent
+	{
 
 		internal override void Accept (LogEventVisitor visitor)
 		{
@@ -349,7 +405,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCFinalizeObjectBeginEvent : LogEvent {
+	public sealed class GCFinalizeObjectBeginEvent : LogEvent
+	{
 
 		public long ObjectPointer { get; internal set; }
 
@@ -359,7 +416,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class GCFinalizeObjectEndEvent : LogEvent {
+	public sealed class GCFinalizeObjectEndEvent : LogEvent
+	{
 
 		public long ObjectPointer { get; internal set; }
 
@@ -369,7 +427,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ThrowEvent : LogEvent {
+	public sealed class ThrowEvent : LogEvent
+	{
 
 		public long ObjectPointer { get; internal set; }
 
@@ -381,7 +440,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ExceptionClauseEvent : LogEvent {
+	public sealed class ExceptionClauseEvent : LogEvent
+	{
 
 		public LogExceptionClause Type { get; internal set; }
 
@@ -397,7 +457,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class EnterEvent : LogEvent {
+	public sealed class EnterEvent : LogEvent
+	{
 
 		public long MethodPointer { get; internal set; }
 
@@ -407,7 +468,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class LeaveEvent : LogEvent {
+	public sealed class LeaveEvent : LogEvent
+	{
 
 		public long MethodPointer { get; internal set; }
 
@@ -417,7 +479,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class ExceptionalLeaveEvent : LogEvent {
+	public sealed class ExceptionalLeaveEvent : LogEvent
+	{
 
 		public long MethodPointer { get; internal set; }
 
@@ -427,7 +490,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class MonitorEvent : LogEvent {
+	public sealed class MonitorEvent : LogEvent
+	{
 
 		public LogMonitorEvent Event { get; internal set; }
 
@@ -441,7 +505,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class SampleHitEvent : LogEvent {
+	public sealed class SampleHitEvent : LogEvent
+	{
 
 		public long ThreadId { get; internal set; }
 
@@ -455,9 +520,11 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class CounterSamplesEvent : LogEvent {
+	public sealed class CounterSamplesEvent : LogEvent
+	{
 
-		public struct CounterSample {
+		public struct CounterSample
+		{
 
 			public long Index { get; internal set; }
 
@@ -474,9 +541,11 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class CounterDescriptionsEvent : LogEvent {
+	public sealed class CounterDescriptionsEvent : LogEvent
+	{
 
-		public struct CounterDescription {
+		public struct CounterDescription
+		{
 
 			public LogCounterSection Section { get; internal set; }
 
@@ -501,7 +570,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class UnmanagedBinaryEvent : LogEvent {
+	public sealed class UnmanagedBinaryEvent : LogEvent
+	{
 
 		public long SegmentPointer { get; internal set; }
 
@@ -517,7 +587,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class UnmanagedSymbolEvent : LogEvent {
+	public sealed class UnmanagedSymbolEvent : LogEvent
+	{
 
 		public long CodePointer { get; internal set; }
 
@@ -531,7 +602,8 @@ namespace Mono.Profiler.Log {
 		}
 	}
 
-	public sealed class SynchronizationPointEvent : LogEvent {
+	public sealed class SynchronizationPointEvent : LogEvent
+	{
 
 		public LogSynchronizationPoint Type { get; internal set; }
 

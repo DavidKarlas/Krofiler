@@ -4,10 +4,12 @@
 
 using System;
 
-namespace Mono.Profiler.Log {
+namespace Mono.Profiler.Log
+{
 
 	// mono/profiler/log.h : TYPE_*
-	enum LogEventType {
+	enum LogEventType
+	{
 		Allocation = 0,
 		GC = 1,
 		Metadata = 2,
@@ -54,6 +56,8 @@ namespace Mono.Profiler.Log {
 		HeapEnd = 1 << 4,
 		HeapObject = 2 << 4,
 		HeapRoots = 3 << 4,
+		HeapRootRegister = 4 << 4,
+		HeapRootUnregister = 5 << 4,
 
 		SampleHit = 0 << 4,
 		SampleUnmanagedSymbol = 1 << 4,
@@ -67,7 +71,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/profiler/log.h : TYPE_*
-	enum LogMetadataType {
+	enum LogMetadataType
+	{
 		Class = 1,
 		Image = 2,
 		Assembly = 3,
@@ -77,7 +82,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/utils/mono-counters.h : MONO_COUNTER_*
-	public enum LogCounterType {
+	public enum LogCounterType
+	{
 		Int32 = 0,
 		UInt32 = 1,
 		Word = 2,
@@ -89,7 +95,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/utils/mono-counters.h : MONO_COUNTER_*
-	public enum LogCounterSection {
+	public enum LogCounterSection
+	{
 		Jit = 1 << 8,
 		GC = 1 << 9,
 		Metadata = 1 << 10,
@@ -102,7 +109,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/utils/mono-counters.h : MONO_COUNTER_*
-	public enum LogCounterUnit {
+	public enum LogCounterUnit
+	{
 		Raw = 0 << 24,
 		Bytes = 1 << 24,
 		Time = 2 << 24,
@@ -111,14 +119,16 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/utils/mono-counters.h : MONO_COUNTER_*
-	public enum LogCounterVariance {
+	public enum LogCounterVariance
+	{
 		Monotonic = 1 << 28,
 		Constant = 1 << 29,
 		Variable = 1 << 30,
 	}
 
 	// mono/metadata/profiler.h : MonoProfilerCodeBufferType
-	public enum LogJitHelper {
+	public enum LogJitHelper
+	{
 		Unknown = 0,
 		Method = 1,
 		MethodTrampoline = 2,
@@ -134,7 +144,8 @@ namespace Mono.Profiler.Log {
 
 	// mono/metadata/profiler.h : MonoProfilerGCRootType
 	[Flags]
-	public enum LogHeapRootAttributes {
+	public enum LogHeapRootAttributes
+	{
 		Pinning = 1 << 8,
 		WeakReference = 2 << 8,
 		Interior = 4 << 8,
@@ -149,14 +160,16 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/profiler/log.h : MonoProfilerMonitorEvent
-	public enum LogMonitorEvent {
+	public enum LogMonitorEvent
+	{
 		Contention = 1,
 		Done = 2,
 		Fail = 3,
 	}
 
 	// mono/metadata/metadata.h : MonoExceptionEnum
-	public enum LogExceptionClause {
+	public enum LogExceptionClause
+	{
 		Catch = 0,
 		Filter = 1,
 		Finally = 2,
@@ -164,7 +177,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/metadata/profiler.h : MonoProfilerGCEvent
-	public enum LogGCEvent {
+	public enum LogGCEvent
+	{
 		PreStopWorld = 6,
 		PreStopWorldLocked = 10,
 		PostStopWorld = 7,
@@ -185,7 +199,8 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/metadata/mono-gc.h : MonoGCHandleType
-	public enum LogGCHandleType {
+	public enum LogGCHandleType
+	{
 		Weak = 0,
 		WeakTrackResurrection = 1,
 		Normal = 2,
@@ -193,25 +208,48 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/profiler/log.h : MonoProfilerSyncPointType
-	public enum LogSynchronizationPoint {
+	public enum LogSynchronizationPoint
+	{
 		Periodic = 0,
 		WorldStop = 1,
 		WorldStart = 2,
 	}
 
 	// mono/metadata/profiler.h : MonoProfilerSampleMode
-	public enum LogSampleMode {
+	public enum LogSampleMode
+	{
 		None = 0,
 		Process = 1,
 		Real = 2,
 	}
 
 	// mono/profiler/log.h : MonoProfilerHeapshotMode
-	public enum LogHeapshotMode {
+	public enum LogHeapshotMode
+	{
 		None = 0,
 		EveryMajor = 1,
 		OnDemand = 2,
 		Milliseconds = 3,
 		Collections = 4,
+	}
+
+	// mono/metadata/mono-gc.h : MonoGCRootSource
+	public enum LogHeapRootSource
+	{
+		External = 0,
+		Stack = 1,
+		FinalizerQueue = 2,
+		StaticVariable = 3,
+		ThreadLocalVariable = 4,
+		ContextLocalVariable = 5,
+		GCHandle = 6,
+		JIT = 7,
+		Threading = 8,
+		AppDomain = 9,
+		Reflection = 10,
+		Marshal = 11,
+		ThreadPool = 12,
+		Debugger = 13,
+		RuntimeHandle = 14,
 	}
 }

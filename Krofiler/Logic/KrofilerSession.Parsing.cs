@@ -128,7 +128,7 @@ namespace Krofiler
 			{
 				if (currentHeapshot != null) {
 					foreach (var root in ev.Roots) {
-						currentHeapshot.Roots[root.ObjectPointer] = root.Attributes.ToString();
+						currentHeapshot.Roots[root.ObjectPointer] = rootsEvents.Values.First(re => re.Start <= root.AddressPointer && root.AddressPointer <= re.Start + re.Size);
 					}
 				}
 			}
@@ -145,6 +145,18 @@ namespace Krofiler
 
 				session.NewHeapshot?.Invoke(session, currentHeapshot);
 				currentHeapshot = null;
+			}
+
+			Dictionary<long, HeapRootRegisterEvent> rootsEvents = new Dictionary<long, HeapRootRegisterEvent>();
+
+			public override void Visit(HeapRootRegisterEvent ev)
+			{
+				rootsEvents[ev.Start] = ev;
+			}
+
+			public override void Visit(HeapRootUnregisterEvent ev)
+			{
+				rootsEvents.Remove(ev.Start);
 			}
 
 			int heapshotCounter = 0;

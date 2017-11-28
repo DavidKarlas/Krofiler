@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Mono.Profiler.Log;
 using QuickGraph;
 using QuickGraph.Algorithms.Observers;
 using QuickGraph.Algorithms.Search;
@@ -23,7 +24,7 @@ namespace Krofiler
 	{
 		public Dictionary<long, List<ObjectInfo>> TypesToObjectsListMap = new Dictionary<long, List<ObjectInfo>>();
 		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
-		public Dictionary<long, string> Roots = new Dictionary<long, string>();
+		public Dictionary<long, HeapRootRegisterEvent> Roots = new Dictionary<long, HeapRootRegisterEvent>();
 
 		public string Name {
 			get {
