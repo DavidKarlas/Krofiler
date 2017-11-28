@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using Eto.Forms;
 namespace Krofiler
 {
@@ -90,10 +91,27 @@ namespace Krofiler
 
 		public event InsertTabDelegate InsertTab;
 
+		ProfileAppOptions OpenOptionsDialog ()
+		{
+			//var dialog = new Dialog ();
+			//var stackLayout = new StackLayout ();
+			//var maxFrames = new NumericUpDown ();
+			//maxFrames.Value = 0;
+			//stackLayout.Items.Add (maxFrames);
+			//stackLayout.Padding = new Eto.Drawing.Padding(10);
+			//dialog.Content = stackLayout;
+			//dialog.ShowModal ();
+			var options = new ProfileAppOptions ();
+			options.MaxFrames = 0;
+			options.OutputDir = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), "Desktop");
+			return options;
+		}
+
 		public void StartProfiling(StartProfilingInfo profilingInfo)
 		{
 			if (profilingInfo is StartProfilingProcessInfo) {
-				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath);
+				var options = OpenOptionsDialog ();
+				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath, options);
 			} else if (profilingInfo is StartProfilingFromFileInfo) {
 				CurrentSession = KrofilerSession.CreateFromFile(((StartProfilingFromFileInfo)profilingInfo).MlpdFilePath);
 			} else {

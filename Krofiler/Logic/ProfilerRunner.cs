@@ -11,12 +11,12 @@ namespace Krofiler
 
 		public bool HasExited { get { return profileProcess.HasExited; } }
 
-		internal void Start(string exePath)
+		internal void Start(string exePath, ProfileAppOptions options)
 		{
-			LogFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Desktop", Path.GetRandomFileName() + ".mlpd");
+			LogFilePath =  Path.Combine(options.OutputDir, Path.GetRandomFileName() + ".mlpd");
 			profileProcess = new Process();
 			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
-			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,alloc,nocalls,maxframes=12,output=\"{LogFilePath}\" \"{exePath}\"";
+			profileProcess.StartInfo.Arguments = $"--profile=log:heapshot=ondemand,alloc,nocalls,maxframes={options.MaxFrames},output=\"{LogFilePath}\" \"{exePath}\"";
 			profileProcess.Start();
 		}
 
