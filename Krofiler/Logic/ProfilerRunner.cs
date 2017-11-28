@@ -16,7 +16,7 @@ namespace Krofiler
 			LogFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Desktop", Path.GetRandomFileName() + ".mlpd");
 			profileProcess = new Process();
 			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
-			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,alloc,nocalls,maxframes=10,output=\"{LogFilePath}\" \"{exePath}\"";
+			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,alloc,nocalls,maxframes=12,output=\"{LogFilePath}\" \"{exePath}\"";
 			profileProcess.Start();
 		}
 

@@ -112,11 +112,6 @@ namespace Krofiler
 						allocationsTracker.Remove(ev.OldObjectPointers[i]);
 					}
 				}
-				if(currentHeapshot!=null){
-					for (int i = 0; i < ev.NewObjectPointers.Count; i++) {
-						Console.WriteLine(ev.OldObjectPointers[i] + " - " + ev.NewObjectPointers[i]);
-					}
-				}
 			}
 
 			public override void Visit(HeapBeginEvent ev)
@@ -134,9 +129,7 @@ namespace Krofiler
 				if (currentHeapshot != null) {
 					foreach (var root in ev.Roots) {
 						currentHeapshot.Roots[root.ObjectPointer] = root.Attributes.ToString();
-						Console.Write(root.ObjectPointer + ",");
 					}
-					Console.WriteLine();
 				}
 			}
 
