@@ -40,12 +40,12 @@ namespace Krofiler
 			} else {
 				var shortestPath = heapshot.GetShortestPathToRoot(objectInfo.ObjAddr);
 				foreach (var edge in shortestPath) {
-					var objInfo = heapshot.ObjectsInfoMap[edge.Source];
+					var objInfo = heapshot.ObjectsInfoMap[edge.Target];
 					var typeName = session.GetTypeName(objInfo.TypeId);
 					retentionList.Items.Add(new RetentionItem(typeName, objInfo));//TODO: Add field to name
 				}
 				if (shortestPath.Any()) {
-					if (heapshot.Roots.TryGetValue(shortestPath.Last().Source, out root))
+					if (heapshot.Roots.TryGetValue(shortestPath.Last().Target, out root))
 						retentionList.Items.Add("Root info:" + root);
 				} else
 					retentionList.Items.Add("This is weird... Couldn't find path to root");
