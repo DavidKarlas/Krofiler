@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Prototype", "Prototype\Prot
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Krofiler.UI", "Krofiler.UI\Krofiler.UI.shproj", "{3042A285-9A55-42F5-A665-9243BDDACCA8}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Mono.Profiler.Log", "Mono.Profiler.Log\Mono.Profiler.Log.shproj", "{3284B528-D279-4514-83A3-9A1869C684DC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

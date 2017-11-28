@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{3284B528-D279-4514-83A3-9A1869C684DC}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Mono.Profiler.Log</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)LogBufferHeader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogEnums.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogEvent.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogEvents.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogEventVisitor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogException.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogProcessor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogProfiler.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogStream.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LogStreamHeader.cs" />
+  </ItemGroup>
+</Project>

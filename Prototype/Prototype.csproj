@@ -40,9 +40,6 @@
     <Reference Include="QuickGraph.Serialization">
       <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Serialization.dll</HintPath>
     </Reference>
-    <Reference Include="Mono.Profiler.Log">
-      <HintPath>..\..\..\..\..\Library\Frameworks\Mono.framework\Versions\5.9.0\lib\mono\gac\Mono.Profiler.Log\4.0.0.0__0738eb9f132ed756\Mono.Profiler.Log.dll</HintPath>
-    </Reference>
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -52,6 +49,7 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <Import Project="..\Mono.Profiler.Log\Mono.Profiler.Log.projitems" Label="Shared" Condition="Exists('..\Mono.Profiler.Log\Mono.Profiler.Log.projitems')" />
   <Import Project="..\Krofiler\Krofiler.projitems" Label="Shared" Condition="Exists('..\Krofiler\Krofiler.projitems')" />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
