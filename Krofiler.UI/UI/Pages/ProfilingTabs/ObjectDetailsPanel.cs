@@ -29,7 +29,7 @@ namespace Krofiler
 		void OnObjectIdChanged()
 		{
 			stacktraceView.Items.Clear();
-			var sf = objectInfo.Allocation.Backtrace.Select(b => b.ToString());
+			var sf = objectInfo.Allocation.Backtrace.Select(b => session.GetMethodName(b));
 			foreach (var f in sf) {
 				stacktraceView.Items.Add(f);
 			}

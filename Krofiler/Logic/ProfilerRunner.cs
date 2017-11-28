@@ -13,14 +13,10 @@ namespace Krofiler
 
 		internal void Start(string exePath)
 		{
-			LogFilePath = Path.Combine("/Users/davidkarlas/Desktop/profiles/", Path.GetRandomFileName() + ".mlpd");
+			LogFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Desktop", Path.GetRandomFileName() + ".mlpd");
 			profileProcess = new Process();
-			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono";
-			//profileProcess.StartInfo.FileName = "/opt9/mono/bin/mono";
-			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,noalloc,nocalls,maxframes=999,output=\"{LogFilePath}\" \"{exePath}\"";
-			//profileProcess.StartInfo.UseShellExecute = false;
-			//profileProcess.StartInfo.RedirectStandardOutput = true;
-			//profileProcess.StartInfo.RedirectStandardError = true;
+			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
+			profileProcess.StartInfo.Arguments = $"--gc=sgen --profile=log:heapshot=ondemand,alloc,nocalls,maxframes=10,output=\"{LogFilePath}\" \"{exePath}\"";
 			profileProcess.Start();
 		}
 

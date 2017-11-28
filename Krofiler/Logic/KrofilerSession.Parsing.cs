@@ -187,6 +187,11 @@ namespace Krofiler
 
 				currentHeapshot.ObjectsInfoMap.Add(ev.ObjectPointer, obj);
 			}
+
+			public override void Visit(JitEvent ev)
+			{
+				session.methodsNames[ev.MethodPointer] = ev.Name;
+			}
 		}
 
 		CancellationTokenSource cts = new CancellationTokenSource();
@@ -215,19 +220,6 @@ namespace Krofiler
 		List<Heapshot> heapshots = new List<Heapshot>();
 
 		public Dictionary<long, string> methodsNames = new Dictionary<long, string>();
-		//int maxDepth = 0;
-		StackFrame GetStackFrame(long[] backtrace)
-		{
-			//maxDepth = Math.Max(maxDepth, backtrace.Length);
-			//if (backtrace.Length > 100) {
-			//	Console.WriteLine("Bt:");
-			//	foreach (var v in backtrace)
-			//		Console.WriteLine(v + "(" + GetMethod(v) + "),");
-			//}
-			return rootStackFrame.GetStackFrame(this, backtrace, 0);
-		}
-
-		StackFrame rootStackFrame = new StackFrame(null, -1);
 
 		public string GetMethodName(long methodId)
 		{

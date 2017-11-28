@@ -20,16 +20,16 @@ namespace Krofiler
 		/// </summary>
 		int TcpPort;
 
+		TcpClient client;
+		StreamWriter writer;
 		public async Task TakeHeapShot()
 		{
-			using (var client = new TcpClient()) {
+			if (client == null) {
+				client = new TcpClient();
 				await client.ConnectAsync(IPAddress.Loopback, TcpPort);
-				using (var writer = new StreamWriter(client.GetStream())) {
-					writer.Write("heapshot\n");
-					writer.Flush();
-					Thread.Sleep(1000);
-				}
+				writer = new StreamWriter(client.GetStream());
 			}
+			await writer.WriteAsync("heapshot\n").ConfigureAwait(false);
 		}
 
 		public void KillProfilee()
