@@ -14,11 +14,6 @@ namespace Krofiler
 		ProfilerRunner runner;
 		LogStreamHeader header;
 
-		class NullLogEventVisitor : LogEventVisitor
-		{
-
-		}
-
 		class HeadReaderLogEventVisitor : LogEventVisitor
 		{
 			public CancellationTokenSource TokenSource = new CancellationTokenSource();
@@ -32,10 +27,9 @@ namespace Krofiler
 		static LogStreamHeader TryReadHeader(string mldpFilePath)
 		{
 			try {
-				using (var s = File.OpenRead(mldpFilePath))
-				using (var reader = new LogStream(s)) {
+				using (var s = File.OpenRead(mldpFilePath)) {
 					var visitor = new HeadReaderLogEventVisitor();
-					var processor = new LogProcessor(reader, visitor, new NullLogEventVisitor());
+					var processor = new LogProcessor(s, visitor, null);
 
 					try {
 						processor.Process(visitor.TokenSource.Token);
@@ -49,7 +43,6 @@ namespace Krofiler
 		}
 
 		TaskCompletionSource<bool> completionSource;
-		IProgress<float> progress;
 		CancellationToken cancellation;
 		FileStream fileStream;
 
@@ -78,10 +71,9 @@ namespace Krofiler
 			var cancellationToken = cts.Token;
 
 			try {
-				using (fileStream = new FileStream(fileToProcess, FileMode.Open, FileAccess.Read, FileShare.Read))
-				using (var logStream = new LogStream(fileStream)) {
-					var processor = new LogProcessor(logStream, new KrofilerLogEventVisitor(this), new NullLogEventVisitor());
-					processor.Process(cancellation);
+				using (fileStream = new FileStream(fileToProcess, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+					var processor = new LogProcessor(fileStream, new KrofilerLogEventVisitor(this), null);
+					processor.Process(cancellation, runner != null);
 				}
 				if (cancellation.IsCancellationRequested)
 					completionSource.SetCanceled();

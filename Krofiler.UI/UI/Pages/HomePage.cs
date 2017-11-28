@@ -1,6 +1,8 @@
 ﻿using System;
 using Eto.Forms;
 using System.Linq;
+using System.Threading.Tasks;
+
 namespace Krofiler
 {
 	public class HomePage : StackLayout
@@ -76,6 +78,9 @@ namespace Krofiler
 
 			StartProfiling(new StartProfilingFromFileInfo() {
 				MlpdFilePath = fileName
+			});
+			Task.Delay (1000).ContinueWith (delegate {
+				UIThreadMonitor.Profile (10);
 			});
 		}
 

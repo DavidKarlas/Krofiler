@@ -29,7 +29,8 @@ namespace Krofiler
 				await client.ConnectAsync(IPAddress.Loopback, TcpPort);
 				writer = new StreamWriter(client.GetStream());
 			}
-			await writer.WriteAsync("heapshot\n").ConfigureAwait(false);
+			writer.Write ("heapshot\n");
+			writer.Flush();
 		}
 
 		public void KillProfilee()

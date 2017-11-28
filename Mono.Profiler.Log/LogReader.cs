@@ -89,12 +89,16 @@ namespace Mono.Profiler.Log {
 			return _encoding.GetString (_stringBuffer, 0, pos);
 		}
 
+		static ulong slebTotal = 0;
+		static ulong slebBytes = 0;
+
 		public long ReadSLeb128 ()
 		{
 			long result = 0;
 			var shift = 0;
-
+			slebTotal++;
 			while (true) {
+				slebBytes++;
 				var b = ReadByte ();
 
 				result |= (long) (b & 0x7f) << shift;
@@ -111,12 +115,15 @@ namespace Mono.Profiler.Log {
 			return result;
 		}
 
+		static ulong ulebTotal = 0;
+		static ulong ulebBytes = 0;
 		public ulong ReadULeb128 ()
 		{
 			ulong result = 0;
 			var shift = 0;
-
+			ulebTotal++;
 			while (true) {
+				ulebBytes++;
 				var b = ReadByte ();
 
 				result |= (ulong) (b & 0x7f) << shift;
