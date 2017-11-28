@@ -35,6 +35,7 @@ namespace Krofiler.Reader
 	public class ClassInfo
 	{
 		public readonly ushort Id;
+		public readonly long Address;
 		public readonly ushort ParentId;
 		public readonly string Name;
 		public readonly FieldInfo[] Fields;
@@ -42,6 +43,7 @@ namespace Krofiler.Reader
 		internal ClassInfo(MyBinaryReader reader)
 		{
 			Id = reader.ReadUInt16();
+			Address = reader.ReadPointer();
 			ParentId = reader.ReadUInt16();
 			Name = reader.ReadString();
 			var fieldsCount = reader.ReadUInt16();

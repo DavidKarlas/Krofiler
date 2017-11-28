@@ -4,7 +4,7 @@ using Krofiler.Capturer;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 
-namespace IdeDiagnosticsExtras
+namespace Krofiler.Ide
 {
 	public class TakeHeapshot : CommandHandler
 	{

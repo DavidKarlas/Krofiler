@@ -14,11 +14,11 @@ namespace Krofiler.Capturer
 
 	public static class Heapshot
 	{
-		[DllImport("libKrofiler")]
+		[DllImport("libmono-profiler-krofiler")]
 		extern static void krofiler_start(string path, int flags);
-		[DllImport("libKrofiler")]
+		[DllImport("libmono-profiler-krofiler")]
 		extern static void krofiler_take_heapshot();
-		[DllImport("libKrofiler")]
+		[DllImport("libmono-profiler-krofiler")]
 		extern static void krofiler_stop();
 
 		public static void Start(string path, CaptureFlags flags)

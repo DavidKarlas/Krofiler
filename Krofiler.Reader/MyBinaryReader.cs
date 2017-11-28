@@ -11,7 +11,10 @@ namespace Krofiler.Reader
 		Allocs = 1,
 		Moves = 2,
 		AllocsStackTrace = 4,
+		RootEvents = 8,
+		RootEventsStackTrace = 16
 	}
+
 	class MyBinaryReader : BinaryReader
 	{
 		public readonly byte pointerSize;

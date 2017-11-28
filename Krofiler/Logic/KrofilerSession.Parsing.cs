@@ -13,6 +13,8 @@ namespace Krofiler
 	{
 		ProfilerRunner runner;
 		public LargeList<object> AllAllocsAndMoves = new LargeList<object>();
+		public List<object> AllRootRegAndUnReg = new List<object>();
+		public List<MethodJit> AllMethods = new List<MethodJit>();
 
 		public void ProcessFile()
 		{
@@ -72,8 +74,10 @@ namespace Krofiler
 				}
 				var root = obj as Root;
 				if (root != null) {
-					foreach (var r in root.Addresses) {
-						currentHeapshot.Roots[r] = new RootInfo();
+					for (int i = 0; i < root.Addresses.Length; i++) {
+						currentHeapshot.Roots[root.Objects[i]] = new RootInfo() {
+							Object = root.Addresses[i]
+						};
 					}
 					continue;
 				}
@@ -98,6 +102,13 @@ namespace Krofiler
 					NewHeapshot?.Invoke(this, currentHeapshot);
 					currentHeapshot = new Heapshot(heapshots.Count, this, AllAllocsAndMoves.Count);
 					continue;
+				}
+				if (obj is RootRegister rr) {
+					AllRootRegAndUnReg.Add(rr);
+				} else if (obj is RootUnregister ur) {
+					AllRootRegAndUnReg.Add(ur);
+				}else if(obj is MethodJit mj){
+					AllMethods.Add(mj);
 				}
 			}
 			Finished?.Invoke(this);

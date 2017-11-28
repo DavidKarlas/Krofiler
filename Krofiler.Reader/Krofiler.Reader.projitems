@@ -19,5 +19,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)MyBinaryReader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Reader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Root.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)RootRegister.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)RootUnregister.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MethodJit.cs" />
   </ItemGroup>
 </Project>

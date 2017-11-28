@@ -5,5 +5,6 @@ namespace Krofiler.Reader
 	{
 		public long Address;
 		public string[] AllocStack;
+		public long[] AllocStackAddresses;
 	}
 }

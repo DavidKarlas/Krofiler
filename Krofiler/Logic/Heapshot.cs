@@ -22,6 +22,7 @@ namespace Krofiler
 
 	public class RootInfo
 	{
+		public long Object;
 		public string Reason = string.Empty;
 	}
 

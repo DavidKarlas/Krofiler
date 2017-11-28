@@ -1,14 +1,11 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <ExtensionModel>
 	<Extension path="/MonoDevelop/Ide/Commands">
-		<Command id="IdeDiagnosticsExtras.TakeHeapshot"
-			defaultHandler="IdeDiagnosticsExtras.TakeHeapshot"
+		<Command id="Krofiler.Ide.TakeHeapshot"
+			defaultHandler="Krofiler.Ide.TakeHeapshot"
 			_label="Take heapshot" />
 	</Extension>
 	<Extension path="/MonoDevelop/Ide/MainMenu/Help/Diagnostics">
-		<CommandItem id="IdeDiagnosticsExtras.TakeHeapshot" />
+		<CommandItem id="Krofiler.Ide.TakeHeapshot" />
 	</Extension>
-	<Runtime>
-		<Import file="libMonoProfiler.dylib" />
-	</Runtime>
 </ExtensionModel>

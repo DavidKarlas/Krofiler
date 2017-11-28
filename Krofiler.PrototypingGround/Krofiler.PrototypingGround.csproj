@@ -41,10 +41,14 @@
       <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Serialization.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml" />
+    <Reference Include="System.ValueTuple">
+      <HintPath>..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="HeapTracker.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -54,6 +58,6 @@
   <Import Project="..\Krofiler.Reader\Krofiler.Reader.projitems" Label="Shared" Condition="Exists('..\Krofiler.Reader\Krofiler.Reader.projitems')" />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="CompileMonoProfilerLib" BeforeTargets="Build">
-    <Exec Command="clang -g -I$(MonoSource) -I$(MonoSource)/eglib/src -m64 -undefined suppress -flat_namespace -o bin/$(Configuration)/libKrofiler.dylib ../Krofiler.Capturer.Shared/Krofiler.c" />
+    <Exec Command="gcc -g -m64 -undefined suppress -flat_namespace -fPIC -shared -I$(MonoSource) -I$(MonoSource)/mono/eglib/ -o bin/$(Configuration)/libmono-profiler-krofiler.dylib ../Krofiler.Capturer.Shared/Krofiler.c" />
   </Target>
 </Project>

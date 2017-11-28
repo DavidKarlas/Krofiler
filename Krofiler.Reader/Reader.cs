@@ -40,19 +40,21 @@ namespace Krofiler.Reader
 					return new HeapObject(reader);
 				case 3:
 					var addr = reader.ReadPointer();
-					var stack = new List<string>();
+					string[] stack = null;
+					long[] stackAddresses = null;
 					if ((reader.Flags & CaptureFlags.AllocsStackTrace) == CaptureFlags.AllocsStackTrace) {
-						do {
-							var method = reader.ReadString();
-							if (method == "") {
-								break;
-							}
-							stack.Add(method);
-						} while (true);
+						int size = reader.ReadByte();
+						stack = new string[size];
+						stackAddresses = new long[size];
+						for (int i = 0; i < size; i++) {
+							stackAddresses[i] = reader.ReadPointer();
+							stack[i] = reader.ReadString();
+						}
 					}
 					return new HeapAlloc() {
 						Address = addr,
-						AllocStack = stack.ToArray()
+						AllocStack = stack,
+						AllocStackAddresses = stackAddresses
 					};
 				case 4:
 					var len = reader.ReadByte();
@@ -71,6 +73,12 @@ namespace Krofiler.Reader
 					return new HeapStart();
 				case 8:
 					return new HeapEnd();
+				case 9:
+					return new RootRegister(reader);
+				case 10:
+					return new RootUnregister(reader);
+				case 11:
+					return new MethodJit(reader);
 				default:
 					throw new InvalidDataException($"Type:{type}");
 			}

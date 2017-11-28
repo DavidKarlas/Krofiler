@@ -14,6 +14,7 @@ namespace Krofiler.Reader
 		public readonly string StringValue;
 		public string[] allocStack;
 		public long AllocAddress;
+		public RootRegister Root;
 
 		internal HeapObject(MyBinaryReader reader)
 		{

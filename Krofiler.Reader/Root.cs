@@ -13,12 +13,16 @@ namespace Krofiler.Reader
 		//	RootType = reader.ReadInt32();
 		//	ExtraInfo = reader.ReadPointer();
 		//}
+		public readonly long[] Objects;
 		public readonly long[] Addresses;
 		internal Root(MyBinaryReader reader)
 		{
-			Addresses = new long[reader.ReadByte()];
-			for (int i = 0; i < Addresses.Length; i++)
+			Objects = new long[reader.ReadInt32()];
+			Addresses = new long[Objects.Length];
+			for (int i = 0; i < Addresses.Length; i++) {
+				Objects[i] = reader.ReadPointer();
 				Addresses[i] = reader.ReadPointer();
+			}
 		}
 	}
 }
