@@ -128,7 +128,14 @@ namespace Krofiler
 			{
 				if (currentHeapshot != null) {
 					foreach (var root in ev.Roots) {
-						currentHeapshot.Roots[root.ObjectPointer] = rootsEvents.Values.First(re => re.Start <= root.AddressPointer && root.AddressPointer <= re.Start + re.Size);
+						HeapRootRegisterEvent selectedRegion = null;
+						foreach (var re in rootsEvents.Values) {
+							if(re.Start <= root.AddressPointer && root.AddressPointer <= re.Start + re.Size){
+								selectedRegion = re;
+								break;
+							}
+						}
+						currentHeapshot.Roots[root.ObjectPointer] = selectedRegion;
 					}
 				}
 			}

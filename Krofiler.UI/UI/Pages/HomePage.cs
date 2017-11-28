@@ -79,9 +79,6 @@ namespace Krofiler
 			StartProfiling(new StartProfilingFromFileInfo() {
 				MlpdFilePath = fileName
 			});
-			Task.Delay (1000).ContinueWith (delegate {
-				UIThreadMonitor.Profile (10);
-			});
 		}
 
 		void StartProcess(string exeName)

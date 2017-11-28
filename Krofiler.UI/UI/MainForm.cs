@@ -17,6 +17,36 @@ namespace Krofiler
 	/// </summary>
 	public class MainForm : Form
 	{
+		void Preferences(object sender, EventArgs e)
+		{
+			var window = new Form() {
+				Title = "Preferences"
+			};
+			var numericMaxFrames = new NumericUpDown { Value = Settings.Instance.MaxFrames, MaxValue = 32, MinValue = 0, MaximumDecimalPlaces = 0, Increment = 1 };
+			window.Content = new TableLayout {
+				Spacing = new Size(5, 5), // space between each cell
+				Padding = new Padding(10, 10, 10, 10), // space around the table's sides
+				Rows =
+					{
+					new TableRow(new Label { Text = "Max frames" },numericMaxFrames),
+					new TableRow(
+						new Button { Text = "Cancel", Command=new Command(delegate {
+							window.Close();
+						}) },
+						 new Button { Text = "Save", Command=new Command(delegate {
+							Settings.Instance.MaxFrames=(int)numericMaxFrames.Value;
+							Settings.Instance.Save();
+							window.Close();
+						}) }
+						),
+						// by default, the last row & column will get scaled. This adds a row at the end to take the extra space of the form.
+						// otherwise, the above row will get scaled and stretch the TextBox/ComboBox/CheckBox to fill the remaining height.
+						new TableRow { ScaleHeight = true }
+					}
+			};
+			window.Show();
+		}
+
 		public MainForm()
 		{
 			Title = "Krofiler";
@@ -38,10 +68,18 @@ namespace Krofiler
 				},
 				ApplicationItems = {
 					// application (OS X) or file menu (others)
-					new ButtonMenuItem { Text = "&Preferences..." }
+					new ButtonMenuItem {
+						Text = "&Preferences...",
+						Command= new Command(Preferences)
+					}
 				},
 				QuitItem = quitCommand,
-				AboutItem = aboutCommand
+				AboutItem = aboutCommand,
+				HelpItems = {
+					new ButtonMenuItem{ Text="Profile for 5 seconds", Command= new Command(delegate {
+						UIThreadMonitor.Profile (5);
+					})}
+				}
 			};
 
 			var mainTabControl = new TabControl();

@@ -93,16 +93,8 @@ namespace Krofiler
 
 		ProfileAppOptions OpenOptionsDialog ()
 		{
-			//var dialog = new Dialog ();
-			//var stackLayout = new StackLayout ();
-			//var maxFrames = new NumericUpDown ();
-			//maxFrames.Value = 0;
-			//stackLayout.Items.Add (maxFrames);
-			//stackLayout.Padding = new Eto.Drawing.Padding(10);
-			//dialog.Content = stackLayout;
-			//dialog.ShowModal ();
 			var options = new ProfileAppOptions ();
-			options.MaxFrames = 0;
+			options.MaxFrames = Settings.Instance.MaxFrames;
 			options.OutputDir = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), "Desktop");
 			return options;
 		}

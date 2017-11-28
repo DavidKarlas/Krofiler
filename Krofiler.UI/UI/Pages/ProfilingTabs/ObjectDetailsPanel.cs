@@ -43,37 +43,37 @@ namespace Krofiler
 			}
 
 			retentionPaths.Pages.Clear();
-			if (heapshot.Roots.TryGetValue(objectInfo.ObjAddr, out var root)) {
-				AddSingleEntry("Object is root itself:" + root.Message);
-			} else {
-				var pathsToRoot = heapshot.GetTop5PathsToRoots(objectInfo.ObjAddr);
-				int i = 0;
-				foreach (var path in pathsToRoot.OrderBy(p => p.Count())) {
-					i++;
-					var listBox = new ListBox();
-					listBox.MouseDoubleClick += (s, e) => {
-						if (listBox.SelectedValue is RetentionItem ri) {
-							var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<ObjectInfo>>() {
-								[ri.obj.TypeId] = new List<ObjectInfo>() { ri.obj }
-							});
-							newTab.InsertTab += InsertTab;
-							InsertTab(newTab, null);
-						}
-					};
-					var page = new TabPage(listBox) {
-						Text = $"Path {i}"
-					};
-					retentionPaths.Pages.Add(page);
-					foreach (var edge in path) {
-						var objInfo = heapshot.ObjectsInfoMap[edge.Target];
-						var typeName = session.GetTypeName(objInfo.TypeId);
-						listBox.Items.Add(new RetentionItem(typeName, objInfo));//TODO: Add field to name
+			var pathsToRoot = heapshot.GetTop5PathsToRoots(objectInfo.ObjAddr);
+			int i = 0;
+			foreach (var path in pathsToRoot.OrderBy(p => p.Count())) {
+				i++;
+				var listBox = new ListBox();
+				listBox.MouseDoubleClick += (s, e) => {
+					if (listBox.SelectedValue is RetentionItem ri) {
+						var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<ObjectInfo>>() {
+							[ri.obj.TypeId] = new List<ObjectInfo>() { ri.obj }
+						});
+						newTab.InsertTab += InsertTab;
+						InsertTab(newTab, null);
 					}
-					listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last().Target].Message, heapshot.ObjectsInfoMap[path.Last().Target]));
+				};
+				var page = new TabPage(listBox) {
+					Text = $"Path {i}"
+				};
+				retentionPaths.Pages.Add(page);
+				foreach (var edge in path) {
+					var objInfo = heapshot.ObjectsInfoMap[edge.Target];
+					var typeName = session.GetTypeName(objInfo.TypeId);
+					listBox.Items.Add(new RetentionItem(typeName, objInfo));//TODO: Add field to name
 				}
-				if (!pathsToRoot.Any())
-					AddSingleEntry("This is weird... Couldn't find path to root");
+				listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last().Target].Message, heapshot.ObjectsInfoMap[path.Last().Target]));
 			}
+			if (!pathsToRoot.Any())
+				if (heapshot.Roots.TryGetValue(objectInfo.ObjAddr, out var root))
+					AddSingleEntry("Object is root itself:" + root.Message);
+				else
+					AddSingleEntry("This is weird... Couldn't find path to root");
+
 			referencesList.Items.Clear();
 			foreach (var r in objectInfo.ReferencesTo) {
 				var obj = heapshot.ObjectsInfoMap[r];

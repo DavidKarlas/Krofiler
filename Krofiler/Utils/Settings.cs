@@ -15,6 +15,8 @@ namespace Krofiler
 			}
 		}
 
+		public int MaxFrames { get; set; }
+
 		static Settings LoadSettings()
 		{
 			var settingsPath = SettingsPath();
@@ -26,11 +28,12 @@ namespace Krofiler
 		static string SettingsPath()
 		{
 			string dataFolder;
-			//if (EtoEnvironment.Platform.IsWindows) {
-			//	dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Krofiler");
-			//} else {
+			int p = (int)Environment.OSVersion.Platform;
+			if ((p == 4) || (p == 6) || (p == 128)) {
 				dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".krofiler");
-			//}
+			} else {
+				dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Krofiler");
+			}
 
 			return Path.Combine(dataFolder, "Settings.xml");
 		}
