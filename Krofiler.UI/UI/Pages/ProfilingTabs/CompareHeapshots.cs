@@ -117,7 +117,7 @@ namespace Krofiler
 			});
 			typesGrid.Columns.Add (new GridColumn {
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.CollectedObjects.Count.ToString ()) },
-				HeaderText = "Collected Objects"
+				HeaderText = "Dead Objects"
 			});
 			typesGrid.Columns.Add (new GridColumn {
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.TypeName) },
@@ -135,7 +135,7 @@ namespace Krofiler
 				InsertTab (new ObjectListTab (session, newHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
 			var collectedObjs = new Command () {
-				MenuText = "Select Collected objects"
+				MenuText = "Select Dead objects"
 			};
 			collectedObjs.Executed += (sender, e) => {
 				InsertTab (new ObjectListTab (session, oldHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).CollectedObjects } }), this);
