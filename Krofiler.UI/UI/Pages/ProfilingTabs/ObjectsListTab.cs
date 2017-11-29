@@ -6,7 +6,7 @@ using Eto.Forms;
 
 namespace Krofiler
 {
-	public class ObjectListTab : StackLayout, IProfilingTab
+	public class ObjectListTab : Splitter, IProfilingTab
 	{
 		readonly KrofilerSession session;
 		readonly Heapshot heapshot;
@@ -27,17 +27,23 @@ namespace Krofiler
 			CreateTypesView();
 			filterTypesTextBox = new TextBox();
 			filterTypesTextBox.TextChanged += FilterTypesTextBox_TextChanged;
-
+			this.SplitterWidth = 10;
 			var filterAndTypesStackLayout = new StackLayout();
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
-			filterAndTypesStackLayout.Width = (int)Screen.PrimaryScreen.Bounds.Width / 2;
-			this.Items.Add(new StackLayoutItem(filterAndTypesStackLayout, VerticalAlignment.Stretch));
+
+			this.Panel1 = filterAndTypesStackLayout;
 			CreateObjectsView();
-			this.Items.Add(new StackLayoutItem(objectsGrid, VerticalAlignment.Stretch));
+			var splitter2 = new Splitter() {
+				Orientation = Orientation.Horizontal
+			};
+			splitter2.SplitterWidth = 5;
+			splitter2.Panel1= objectsGrid;
 			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
 			objectPanel.InsertTab += (a, b) => InsertTab?.Invoke(a, b ?? this);
-			this.Items.Add(new StackLayoutItem(objectPanel, VerticalAlignment.Stretch, true));
+			splitter2.Panel2 = objectPanel;
+			Panel2 = splitter2;
+			this.Position = (int)Screen.PrimaryScreen.Bounds.Width / 3;
 		}
 
 		public string Title {
