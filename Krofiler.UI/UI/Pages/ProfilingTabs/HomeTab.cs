@@ -91,18 +91,18 @@ namespace Krofiler
 
 		public event InsertTabDelegate InsertTab;
 
-		ProfileAppOptions OpenOptionsDialog ()
+		ProfileAppOptions OpenOptionsDialog()
 		{
-			var options = new ProfileAppOptions ();
+			var options = new ProfileAppOptions();
 			options.MaxFrames = Settings.Instance.MaxFrames;
-			options.OutputDir = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), "Desktop");
+			options.OutputDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Desktop");
 			return options;
 		}
 
 		public void StartProfiling(StartProfilingInfo profilingInfo)
 		{
 			if (profilingInfo is StartProfilingProcessInfo) {
-				var options = OpenOptionsDialog ();
+				var options = OpenOptionsDialog();
 				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath, options);
 			} else if (profilingInfo is StartProfilingFromFileInfo) {
 				CurrentSession = KrofilerSession.CreateFromFile(((StartProfilingFromFileInfo)profilingInfo).MlpdFilePath);
@@ -110,7 +110,15 @@ namespace Krofiler
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
+			CurrentSession.UserError += UserError;
 			CurrentSession.StartParsing();
+		}
+
+		private void UserError(KrofilerSession session, string message, string details)
+		{
+			Application.Instance.Invoke(delegate {
+				Eto.Forms.MessageBox.Show(details, message, type: MessageBoxType.Error);
+			});
 		}
 
 		void HandleNewHeapshot(KrofilerSession session, Heapshot hs)

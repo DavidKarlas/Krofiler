@@ -41,8 +41,12 @@ namespace Krofiler
 			Session = session;
 		}
 
-		void BuildReferencesFrom()
+		public void BuildReferencesFrom()
 		{
+			if (referencesFromBuilt) {
+				return;
+			}
+			referencesFromBuilt = true;
 			var listOfReferences = new List<long>();
 			foreach (var obj in ObjectsInfoMap.Values) {
 				foreach (var r in obj.ReferencesTo)
@@ -64,13 +68,7 @@ namespace Krofiler
 			{
 				return cachedResult;
 			}
-			if (!referencesFromBuilt)
-			{
-				referencesFromBuilt = true;
-				var sw = Stopwatch.StartNew ();
-				BuildReferencesFrom ();
-				sw.Stop ();
-			}
+			BuildReferencesFrom();
 			var result = new List<List<ReferenceEdge>> ();
 			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge> (this);
 			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge> ();

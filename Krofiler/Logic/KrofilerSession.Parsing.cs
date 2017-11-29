@@ -24,20 +24,22 @@ namespace Krofiler
 			}
 		}
 
-		static LogStreamHeader TryReadHeader(string mldpFilePath)
+		LogStreamHeader ReadHeader(string mldpFilePath)
 		{
+			if (!File.Exists(mldpFilePath))
+				return null;
 			try {
 				using (var s = File.OpenRead(mldpFilePath)) {
 					var visitor = new HeadReaderLogEventVisitor();
 					var processor = new LogProcessor(s, visitor, null);
-
 					try {
 						processor.Process(visitor.TokenSource.Token);
-					} catch {
+					} catch (OperationCanceledException) {
 					}
 					return processor.StreamHeader;
 				}
-			} catch {
+			} catch (Exception e) {
+				ReportUserError(e.Message, e.ToString());
 				return null;
 			}
 		}
@@ -63,7 +65,7 @@ namespace Krofiler
 				}
 				Thread.Sleep(500);
 			}
-			header = TryReadHeader(fileToProcess);
+			header = ReadHeader(fileToProcess);
 			if (header == null) {
 				goto retryOpeningLogfile;
 			}
@@ -114,34 +116,20 @@ namespace Krofiler
 				}
 			}
 
+			int heapshotCounter = 0;
+			Heapshot currentHeapshot;
+			Stopwatch processingHeapTime;
+
 			public override void Visit(HeapBeginEvent ev)
 			{
+				processingHeapTime = Stopwatch.StartNew();
 				currentHeapshot = new Heapshot(session, ++heapshotCounter);
-			}
-
-			public override void Visit(ClassLoadEvent ev)
-			{
-				session.classIdToName[ev.ClassPointer] = ev.Name;
-			}
-
-			public override void Visit(HeapRootsEvent ev)
-			{
-				if (currentHeapshot != null) {
-					foreach (var root in ev.Roots) {
-						HeapRootRegisterEvent selectedRegion = null;
-						foreach (var re in rootsEvents.Values) {
-							if(re.Start <= root.AddressPointer && root.AddressPointer <= re.Start + re.Size){
-								selectedRegion = re;
-								break;
-							}
-						}
-						currentHeapshot.Roots[root.ObjectPointer] = selectedRegion;
-					}
-				}
 			}
 
 			public override void Visit(HeapEndEvent ev)
 			{
+				processingHeapTime.Stop();
+				Console.WriteLine($"It took {processingHeapTime.Elapsed} to procees heapshot {heapshotCounter}.");
 				var deadAllocations = new HashSet<long>();
 				foreach (var key in allocationsTracker.Keys)
 					if (!currentHeapshot.ObjectsInfoMap.ContainsKey(key))
@@ -153,21 +141,6 @@ namespace Krofiler
 				session.NewHeapshot?.Invoke(session, currentHeapshot);
 				currentHeapshot = null;
 			}
-
-			Dictionary<long, HeapRootRegisterEvent> rootsEvents = new Dictionary<long, HeapRootRegisterEvent>();
-
-			public override void Visit(HeapRootRegisterEvent ev)
-			{
-				rootsEvents[ev.Start] = ev;
-			}
-
-			public override void Visit(HeapRootUnregisterEvent ev)
-			{
-				rootsEvents.Remove(ev.Start);
-			}
-
-			int heapshotCounter = 0;
-			Heapshot currentHeapshot;
 
 			public override void Visit(HeapObjectEvent ev)
 			{
@@ -190,6 +163,84 @@ namespace Krofiler
 				currentHeapshot.TypesToObjectsListMap[ev.ClassPointer].Add(obj);
 
 				currentHeapshot.ObjectsInfoMap.Add(ev.ObjectPointer, obj);
+			}
+
+			public override void Visit(ClassLoadEvent ev)
+			{
+				session.classIdToName[ev.ClassPointer] = ev.Name;
+			}
+
+			public override void Visit(HeapRootsEvent ev)
+			{
+				if (currentHeapshot != null) {
+					foreach (var root in ev.Roots) {
+						var index = rootsEventsBinary.BinarySearch(root.AddressPointer);
+						if (index < 0) {
+							index = ~index;
+							if (index == 0) {
+								Console.WriteLine($"This should not happen. Root is before any HeapRootsEvent {root.AddressPointer}.");
+								continue;
+							}
+							var rootReg = rootsEvents[rootsEventsBinary[index - 1]];
+							if (rootReg.Start < root.AddressPointer && rootReg.Start + rootReg.Size >= root.AddressPointer) {
+								currentHeapshot.Roots[root.ObjectPointer] = rootReg;
+							} else {
+								Console.WriteLine($"This should not happen. Closest root is too small({root.AddressPointer}):");
+								Console.WriteLine(rootReg);
+							}
+						} else {
+							//We got exact match
+							currentHeapshot.Roots[root.ObjectPointer] = rootsEvents[root.AddressPointer];
+						}
+					}
+				} else {
+					//Console.WriteLine("This should not happen. HeapRootsEvent outside HeapshotBegin/End.");
+				}
+			}
+
+			Dictionary<long, HeapRootRegisterEvent> rootsEvents = new Dictionary<long, HeapRootRegisterEvent>();
+			List<long> rootsEventsBinary = new List<long>();
+
+			public override void Visit(HeapRootRegisterEvent ev)
+			{
+				var index = rootsEventsBinary.BinarySearch(ev.Start);
+				if (index < 0) {//negative index means it's not there
+					index = ~index;
+					if (index - 1 >= 0) {
+						var oneBefore = rootsEvents[rootsEventsBinary[index - 1]];
+						if (oneBefore.Start + oneBefore.Size > ev.Start) {
+							Console.WriteLine("2 HeapRootRegisterEvents overlap:");
+							Console.WriteLine(ev);
+							Console.WriteLine(oneBefore);
+						}
+					}
+					if (index < rootsEventsBinary.Count) {
+						var oneAfter = rootsEvents[rootsEventsBinary[index]];
+						if (oneAfter.Start < ev.Start + ev.Size) {
+							Console.WriteLine("2 HeapRootRegisterEvents overlap:");
+							Console.WriteLine(ev);
+							Console.WriteLine(oneAfter);
+						}
+					}
+					rootsEventsBinary.Insert(index, ev.Start);
+					rootsEvents.Add(ev.Start, ev);
+				} else {
+					Console.WriteLine("2 HeapRootRegisterEvent at same address:");
+					Console.WriteLine(ev);
+					Console.WriteLine(rootsEvents[ev.Start]);
+					rootsEvents[ev.Start] = ev;
+				}
+			}
+
+			public override void Visit(HeapRootUnregisterEvent ev)
+			{
+				if (rootsEvents.Remove(ev.Start)) {
+					var index = rootsEventsBinary.BinarySearch(ev.Start);
+					rootsEventsBinary.RemoveAt(index);
+				} else {
+					Console.WriteLine("HeapRootUnregisterEvent attempted at address that was not Registred:");
+					Console.WriteLine(ev);
+				}
 			}
 
 			public override void Visit(JitEvent ev)

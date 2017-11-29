@@ -11,7 +11,7 @@ namespace Krofiler
 		readonly Heapshot newHeapshot;
 		readonly Heapshot oldHeapshot;
 
-		FilterCollection<TypeChangeInfo> typesCollection = new FilterCollection<TypeChangeInfo> ();
+		FilterCollection<TypeChangeInfo> typesCollection = new FilterCollection<TypeChangeInfo>();
 
 		public string Title {
 			get {
@@ -38,15 +38,15 @@ namespace Krofiler
 			public string TypeName;
 			public long TypeId;
 			public List<ObjectInfo> NewObjects;
-			public List<ObjectInfo> CollectedObjects;
+			public List<ObjectInfo> DeadObjects;
 			public List<ObjectInfo> NewHsObjects;
 			public List<ObjectInfo> OldHsObjects;
 		}
 		TextBox filterTypesTextBox;
 
-		static List<ObjectInfo> EmptyList = new List<ObjectInfo> ();
+		static List<ObjectInfo> EmptyList = new List<ObjectInfo>();
 
-		public CompareHeapshotsTab (KrofilerSession session, Heapshot hs1, Heapshot hs2)
+		public CompareHeapshotsTab(KrofilerSession session, Heapshot hs1, Heapshot hs2)
 		{
 			this.session = session;
 			if (hs2.Id > hs1.Id) {
@@ -56,104 +56,120 @@ namespace Krofiler
 				newHeapshot = hs1;
 				oldHeapshot = hs2;
 			}
-			var diff = new DiffHeap (oldHeapshot, newHeapshot);
-			var newObjects = diff.NewObjects.GroupBy (addr => addr.TypeId).ToDictionary (d => d.Key, d => d.ToList ());
-			var deleted = diff.DeletedObjects.GroupBy (addr => addr.TypeId).ToDictionary (d => d.Key, d => d.ToList ());
+			var diff = new DiffHeap(oldHeapshot, newHeapshot);
+			var newObjects = diff.NewObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
+			var deleted = diff.DeletedObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
 			var allObjectsInOldHs = oldHeapshot.TypesToObjectsListMap;
 			var allObjectsInNewHs = newHeapshot.TypesToObjectsListMap;
-			var hashTableAllTypes = new HashSet<long> ();
+			var hashTableAllTypes = new HashSet<long>();
 			foreach (var t in allObjectsInOldHs)
-				hashTableAllTypes.Add (t.Key);
+				hashTableAllTypes.Add(t.Key);
 			foreach (var t in allObjectsInNewHs)
-				hashTableAllTypes.Add (t.Key);
+				hashTableAllTypes.Add(t.Key);
 			foreach (var typeId in hashTableAllTypes) {
-				typesCollection.Add (new TypeChangeInfo {
+				typesCollection.Add(new TypeChangeInfo {
 					TypeId = typeId,
-					TypeName = session.GetTypeName (typeId),
-					NewObjects = newObjects.ContainsKey (typeId) ? newObjects [typeId] : EmptyList,
-					CollectedObjects = deleted.ContainsKey (typeId) ? deleted [typeId] : EmptyList,
-					OldHsObjects = allObjectsInOldHs.ContainsKey (typeId) ? allObjectsInOldHs [typeId] : EmptyList,
-					NewHsObjects = allObjectsInNewHs.ContainsKey (typeId) ? allObjectsInNewHs [typeId] : EmptyList
+					TypeName = session.GetTypeName(typeId),
+					NewObjects = newObjects.ContainsKey(typeId) ? newObjects[typeId] : EmptyList,
+					DeadObjects = deleted.ContainsKey(typeId) ? deleted[typeId] : EmptyList,
+					OldHsObjects = allObjectsInOldHs.ContainsKey(typeId) ? allObjectsInOldHs[typeId] : EmptyList,
+					NewHsObjects = allObjectsInNewHs.ContainsKey(typeId) ? allObjectsInNewHs[typeId] : EmptyList
 				});
 			}
-			filterTypesTextBox = new TextBox ();
+			filterTypesTextBox = new TextBox();
 			filterTypesTextBox.TextChanged += FilterTypesTextBox_TextChanged;
-			CreateTypesView ();
-			var filterAndTypesStackLayout = new StackLayout ();
-			filterAndTypesStackLayout.Items.Add (new StackLayoutItem (filterTypesTextBox, HorizontalAlignment.Stretch));
-			filterAndTypesStackLayout.Items.Add (new StackLayoutItem (typesGrid, HorizontalAlignment.Stretch, true));
+			CreateTypesView();
+			var filterAndTypesStackLayout = new StackLayout();
+			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
+			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
 
 			Content = filterAndTypesStackLayout;
 		}
 
-		void FilterTypesTextBox_TextChanged (object sender, EventArgs e)
+		void FilterTypesTextBox_TextChanged(object sender, EventArgs e)
 		{
 			var typeNameFilter = filterTypesTextBox.Text;
-			if (string.IsNullOrWhiteSpace (typeNameFilter))
+			if (string.IsNullOrWhiteSpace(typeNameFilter))
 				typesCollection.Filter = null;
 			else
-				typesCollection.Filter = (i) => i.TypeName.Contains (typeNameFilter);
+				typesCollection.Filter = (i) => i.TypeName.Contains(typeNameFilter);
 		}
 
 		GridView typesGrid;
-		void CreateTypesView ()
+		void CreateTypesView()
 		{
 			typesGrid = new GridView {
 				DataStore = typesCollection
 			};
 			typesGrid.AllowMultipleSelection = false;
-			typesCollection.Sort = (x, y) => (y.NewObjects.Count - y.CollectedObjects.Count).CompareTo (x.NewObjects.Count - x.CollectedObjects.Count);
-			typesGrid.Columns.Add (new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => (r.NewObjects.Count - r.CollectedObjects.Count).ToString ()) },
+			typesCollection.Sort = (x, y) => (y.NewObjects.Count - y.DeadObjects.Count).CompareTo(x.NewObjects.Count - x.DeadObjects.Count);
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => (r.NewObjects.Count - r.DeadObjects.Count).ToString()) },
 				HeaderText = "Diff"
 			});
-			typesGrid.Columns.Add (new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.NewHsObjects.Count.ToString ()) },
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => r.NewHsObjects.Count.ToString()) },
 				HeaderText = "Objects"
 			});
-			typesGrid.Columns.Add (new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.NewObjects.Count.ToString ()) },
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => r.NewObjects.Count.ToString()) },
 				HeaderText = "New Objects"
 			});
-			typesGrid.Columns.Add (new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.CollectedObjects.Count.ToString ()) },
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => r.DeadObjects.Count.ToString()) },
 				HeaderText = "Dead Objects"
 			});
-			typesGrid.Columns.Add (new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string> (r => r.TypeName) },
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => r.TypeName) },
 				HeaderText = "Type Name"
 			});
-			typesGrid.ContextMenu = CreateContextMenu ();
+			typesGrid.ContextMenu = CreateContextMenu();
 		}
 
-		ContextMenu CreateContextMenu ()
+		ContextMenu CreateContextMenu()
 		{
-			var newObjs = new Command () {
+			var newObjs = new Command() {
 				MenuText = "Select New objects"
 			};
 			newObjs.Executed += (sender, e) => {
-				InsertTab (new ObjectListTab (session, newHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
+				if (typesGrid.SelectedItem == null) {
+					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
+					return;
+				}
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
-			var collectedObjs = new Command () {
+			var deadObjs = new Command() {
 				MenuText = "Select Dead objects"
 			};
-			collectedObjs.Executed += (sender, e) => {
-				InsertTab (new ObjectListTab (session, oldHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).CollectedObjects } }), this);
+			deadObjs.Executed += (sender, e) => {
+				if (typesGrid.SelectedItem == null) {
+					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
+					return;
+				}
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).DeadObjects } }), this);
 			};
-			var newHs = new Command () {
+			var newHs = new Command() {
 				MenuText = "Select All in New Heapshot"
 			};
 			newHs.Executed += (sender, e) => {
-				InsertTab (new ObjectListTab (session, newHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
+				if (typesGrid.SelectedItem == null) {
+					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
+					return;
+				}
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
 			};
-			var oldHs = new Command () {
+			var oldHs = new Command() {
 				MenuText = "Select All in Old Heapshot"
 			};
 			oldHs.Executed += (sender, e) => {
-				InsertTab (new ObjectListTab (session, oldHeapshot, new Dictionary<long, List<ObjectInfo>> () { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
+				if (typesGrid.SelectedItem == null) {
+					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
+					return;
+				}
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
 			};
 
-			return new ContextMenu (newObjs, collectedObjs, newHs, oldHs);
+			return new ContextMenu(newObjs, deadObjs, newHs, oldHs);
 		}
 	}
 }

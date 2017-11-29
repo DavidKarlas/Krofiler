@@ -99,6 +99,8 @@ namespace Krofiler
 				return;
 			}
 			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1];
+			objectsGrid.SelectedRows = Array.Empty<int>();
+			objectsGrid.SelectRow(0);
 		}
 
 		void CreateObjectsView()
