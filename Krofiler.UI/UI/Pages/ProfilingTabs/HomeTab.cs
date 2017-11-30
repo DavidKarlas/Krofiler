@@ -1,17 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using Eto.Forms;
+using Mono.Profiler.Log;
+
 namespace Krofiler
 {
 	public class HomeTab : StackLayout, IProfilingTab
 	{
 		public KrofilerSession CurrentSession;
 		ProgressBar progressBar;
+		GridView countersView = new GridView();
 		public HomeTab()
 		{
 			Orientation = Orientation.Horizontal;
-			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch, true));
+			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch));
+			Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
+			countersView.DataStore = new ObservableCollection<CountersRow>();
 			FillRandomStuff();
 		}
 
@@ -31,13 +37,13 @@ namespace Krofiler
 			randomStuff.Items.Add(progressBar);
 
 			var stackLayout = new StackLayout();
-			stackLayout.Items.Add(new Label { Text = "Select heapshots for compare:" });
+			stackLayout.Items.Add(new Label { Text = "Select to compare:" });
 			var listBoxsSplitter = new StackLayout { Orientation = Orientation.Horizontal };
 			listViewLeft = new ListBox();
-			listViewLeft.Width = 150;
+			listViewLeft.Width = 50;
 			listViewLeft.Height = 300;
 			listViewRight = new ListBox();
-			listViewRight.Width = 150;
+			listViewRight.Width = 50;
 			listViewRight.Height = 300;
 			listBoxsSplitter.Items.Add(listViewLeft);
 			listBoxsSplitter.Items.Add(listViewRight);
@@ -110,8 +116,51 @@ namespace Krofiler
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
+			CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
+			CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
 			CurrentSession.UserError += UserError;
 			CurrentSession.StartParsing();
+		}
+
+		private void CounterSamplesAdded(CounterSamplesEvent obj)
+		{
+			Application.Instance.Invoke(delegate {
+				var row = new CountersRow();
+				row.time = obj.Time;
+				foreach (var item in obj.Samples) {
+					row.Counters[item.Index] = item.Value;
+				}
+				((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
+			});
+		}
+
+		class CountersRow
+		{
+			public TimeSpan time;
+			public Dictionary<long, object> Counters = new Dictionary<long, object>();
+		}
+
+		private void CountersDescriptionsAdded()
+		{
+			Application.Instance.Invoke(delegate {
+				countersView.Columns.Add(new GridColumn() {
+					Resizable = true,
+					AutoSize = true,
+					Editable = false,
+					HeaderText = "Time sice start",
+					DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
+				});
+				foreach (var item in CurrentSession.Descriptions) {
+					countersView.Columns.Add(new GridColumn() {
+						Resizable=true,
+						AutoSize=false,
+						Editable=false,
+						Sortable=true,
+						HeaderText = item.CounterName+$"({item.Unit}) {item.SectionName}",
+						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.Index) ? r.Counters[item.Index].ToString() : "") },
+					});
+				}
+			});
 		}
 
 		private void UserError(KrofilerSession session, string message, string details)

@@ -91,8 +91,39 @@ namespace Krofiler
 			Finished?.Invoke(this);
 		}
 
+		public event Action CountersDescriptionsAdded;
+		public IReadOnlyList<CounterDescriptionsEvent.CounterDescription> Descriptions;
+		public event Action<CounterSamplesEvent> CounterSamplesAdded;
+		//Dictionary<long, List<Action<object>>> callbacks = new Dictionary<long, List<Action<object>>>();
+		//public void RegisterCounterCallback<T>(CounterDescriptionsEvent.CounterDescription description, Action<object> action)
+		//{
+		//	if (callbacks.TryGetValue(description.Index, out var callbackList)){
+		//		callbackList.Add(action);
+		//	} else {
+		//		callbacks[description.Index] = new List<Action<object>>() { action };
+		//	}
+		//}
+
+
 		class KrofilerLogEventVisitor : LogEventVisitor
 		{
+			public override void Visit(CounterDescriptionsEvent ev)
+			{
+				session.Descriptions = ev.Descriptions;
+				session.CountersDescriptionsAdded?.Invoke();
+			}
+
+			public override void Visit(CounterSamplesEvent ev)
+			{
+				session.CounterSamplesAdded?.Invoke(ev);
+				//foreach (var sample in ev.Samples) {
+				//	if (session.callbacks.TryGetValue(sample.Index, out var callbackList))
+				//		foreach (var callback in callbackList) {
+				//			callback(sample.Value);
+				//		}
+				//}
+			}
+
 			private KrofilerSession session;
 			Dictionary<long, AllocationEvent> allocationsTracker = new Dictionary<long, AllocationEvent>();
 
@@ -116,7 +147,7 @@ namespace Krofiler
 				}
 			}
 
-			int heapshotCounter = 0;
+			int heapshotCounter;
 			Heapshot currentHeapshot;
 			Stopwatch processingHeapTime;
 

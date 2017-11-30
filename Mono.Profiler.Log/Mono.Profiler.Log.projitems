@@ -16,7 +16,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)LogEventVisitor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogException.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogProcessor.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)LogProfiler.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogReader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogStreamHeader.cs" />
   </ItemGroup>

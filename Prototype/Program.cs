@@ -21,6 +21,9 @@ namespace Prototype
 				}
 				Console.WriteLine (new string ('=', 30));
 			};
+			//session.NewCounters += (s, e) => {
+
+			//};
 			session.StartParsing().Wait();
 		}
 	}

@@ -23,6 +23,7 @@ namespace Mono.Profiler.Log {
 		public LogBufferHeader Buffer { get; internal set; }
 
 		public ulong Timestamp { get; internal set; }
+		public TimeSpan Time { get => TimeSpan.FromTicks((long)Timestamp / 100); }
 
 		public override string ToString ()
 		{

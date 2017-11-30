@@ -15,7 +15,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.ProfileeManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.RandomStuff.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Utils.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Logic\LargeList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\ProfilerRunner.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\StackFrame.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\ObjectInfo.cs" />

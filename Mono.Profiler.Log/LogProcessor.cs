@@ -24,7 +24,7 @@ namespace Mono.Profiler.Log
 
 		LogBufferHeader _bufferHeader;
 
-		ulong _time;
+		ulong startTime;
 
 		bool _used;
 
@@ -72,7 +72,6 @@ namespace Mono.Profiler.Log
 			_reader = new LogReader (Stream, true);
 
 			StreamHeader = new LogStreamHeader (_reader);
-
 			List<LogEvent> events = null;
 			if (SortedVisitor != null)
 				events = new List<LogEvent> (Environment.ProcessorCount * 1000);
@@ -136,7 +135,12 @@ namespace Mono.Profiler.Log
 			var basicType = (LogEventType)(type & 0xf);
 			var extType = (LogEventType)(type & 0xf0);
 
-			_time = ReadTime ();
+			var _time = ReadTime() - startTime;
+
+			if (startTime == 0) {
+				startTime = _time;
+				_time = 0;
+			}
 			LogEvent ev = null;
 
 			switch (basicType)
@@ -615,7 +619,7 @@ namespace Mono.Profiler.Log
 									list [i] = new CounterDescriptionsEvent.CounterDescription
 									{
 										Section = section,
-										SectionName = section == LogCounterSection.User ? _reader.ReadCString () : null,
+										SectionName = section == LogCounterSection.User ? _reader.ReadCString () : section.ToString(),
 										CounterName = _reader.ReadCString (),
 										Type = (LogCounterType)_reader.ReadByte (),
 										Unit = (LogCounterUnit)_reader.ReadByte (),
