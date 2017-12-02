@@ -12,31 +12,15 @@ namespace Krofiler
 	public partial class KrofilerSession
 	{
 		ProfilerRunner runner;
-		LogStreamHeader header;
-
-		class HeadReaderLogEventVisitor : LogEventVisitor
-		{
-			public CancellationTokenSource TokenSource = new CancellationTokenSource();
-
-			public override void VisitBefore(LogEvent ev)
-			{
-				TokenSource.Cancel();
-			}
-		}
 
 		LogStreamHeader ReadHeader(string mldpFilePath)
 		{
 			if (!File.Exists(mldpFilePath))
 				return null;
 			try {
-				using (var s = File.OpenRead(mldpFilePath)) {
-					var visitor = new HeadReaderLogEventVisitor();
-					var processor = new LogProcessor(s, visitor, null);
-					try {
-						processor.Process(visitor.TokenSource.Token);
-					} catch (OperationCanceledException) {
-					}
-					return processor.StreamHeader;
+				using (var s = File.OpenRead(mldpFilePath))
+				using (var _reader = new LogReader(s, true)) {
+					return new LogStreamHeader(_reader);
 				}
 			} catch (Exception e) {
 				ReportUserError(e.Message, e.ToString());
@@ -65,7 +49,7 @@ namespace Krofiler
 				}
 				Thread.Sleep(500);
 			}
-			header = ReadHeader(fileToProcess);
+			var header = ReadHeader(fileToProcess);
 			if (header == null) {
 				goto retryOpeningLogfile;
 			}
@@ -74,7 +58,7 @@ namespace Krofiler
 
 			try {
 				using (fileStream = new FileStream(fileToProcess, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-					var processor = new LogProcessor(fileStream, new KrofilerLogEventVisitor(this), null);
+					var processor = new LogProcessor(fileStream, new KrofilerLogEventVisitor(this));
 					processor.Process(cancellation, runner != null);
 				}
 				if (cancellation.IsCancellationRequested)
@@ -134,11 +118,13 @@ namespace Krofiler
 
 			public override void Visit(AllocationEvent ev)
 			{
+				return;
 				allocationsTracker[ev.ObjectPointer] = ev;
 			}
 
 			public override void Visit(GCMoveEvent ev)
 			{
+				return;
 				for (int i = 0; i < ev.NewObjectPointers.Count; i++) {
 					if (allocationsTracker.TryGetValue(ev.OldObjectPointers[i], out var allocation)) {
 						allocationsTracker[ev.NewObjectPointers[i]] = allocation;
@@ -184,19 +170,29 @@ namespace Krofiler
 				}
 
 				var obj = new ObjectInfo();
-				obj.Allocation = allocationsTracker[ev.ObjectPointer];
+				if (allocationsTracker.Count > 0)
+					obj.Allocation = allocationsTracker[ev.ObjectPointer];
 				obj.ObjAddr = ev.ObjectPointer;
-				obj.TypeId = ev.ClassPointer;
+				if (vtableToClass.ContainsKey(ev.VTablePointer))
+					obj.TypeId = vtableToClass[ev.VTablePointer];
+				else
+					Console.WriteLine(ev.VTablePointer);
 				obj.ReferencesTo = ev.References.Select(r => r.ObjectPointer).ToArray();
 				obj.ReferencesAt = ev.References.Select(r => (ushort)r.Offset).ToArray();
-				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(ev.ClassPointer))
-					currentHeapshot.TypesToObjectsListMap[ev.ClassPointer] = new List<ObjectInfo>();
-				currentHeapshot.TypesToObjectsListMap[ev.ClassPointer].Add(obj);
+				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(obj.TypeId))
+					currentHeapshot.TypesToObjectsListMap[obj.TypeId] = new List<ObjectInfo>();
+				currentHeapshot.TypesToObjectsListMap[obj.TypeId].Add(obj);
 
 				currentHeapshot.ObjectsInfoMap.Add(ev.ObjectPointer, obj);
 			}
 
-			public override void Visit(ClassLoadEvent ev)
+			Dictionary<long, long> vtableToClass = new Dictionary<long, long>();
+			public override void Visit(VTableLoadEvent ev)
+			{
+				vtableToClass[ev.VTablePointer] = ev.ClassPointer;
+			}
+
+            public override void Visit(ClassLoadEvent ev)
 			{
 				session.classIdToName[ev.ClassPointer] = ev.Name;
 			}
@@ -213,7 +209,7 @@ namespace Krofiler
 								continue;
 							}
 							var rootReg = rootsEvents[rootsEventsBinary[index - 1]];
-							if (rootReg.Start < root.AddressPointer && rootReg.Start + rootReg.Size >= root.AddressPointer) {
+							if (rootReg.RootPointer < root.AddressPointer && rootReg.RootPointer + rootReg.RootSize >= root.AddressPointer) {
 								currentHeapshot.Roots[root.ObjectPointer] = rootReg;
 							} else {
 								Console.WriteLine($"This should not happen. Closest root is too small({root.AddressPointer}):");
@@ -234,12 +230,12 @@ namespace Krofiler
 
 			public override void Visit(HeapRootRegisterEvent ev)
 			{
-				var index = rootsEventsBinary.BinarySearch(ev.Start);
+				var index = rootsEventsBinary.BinarySearch(ev.RootPointer);
 				if (index < 0) {//negative index means it's not there
 					index = ~index;
 					if (index - 1 >= 0) {
 						var oneBefore = rootsEvents[rootsEventsBinary[index - 1]];
-						if (oneBefore.Start + oneBefore.Size > ev.Start) {
+						if (oneBefore.RootPointer + oneBefore.RootSize > ev.RootPointer) {
 							Console.WriteLine("2 HeapRootRegisterEvents overlap:");
 							Console.WriteLine(ev);
 							Console.WriteLine(oneBefore);
@@ -247,26 +243,26 @@ namespace Krofiler
 					}
 					if (index < rootsEventsBinary.Count) {
 						var oneAfter = rootsEvents[rootsEventsBinary[index]];
-						if (oneAfter.Start < ev.Start + ev.Size) {
+						if (oneAfter.RootPointer < ev.RootPointer + ev.RootSize) {
 							Console.WriteLine("2 HeapRootRegisterEvents overlap:");
 							Console.WriteLine(ev);
 							Console.WriteLine(oneAfter);
 						}
 					}
-					rootsEventsBinary.Insert(index, ev.Start);
-					rootsEvents.Add(ev.Start, ev);
+					rootsEventsBinary.Insert(index, ev.RootPointer);
+					rootsEvents.Add(ev.RootPointer, ev);
 				} else {
 					Console.WriteLine("2 HeapRootRegisterEvent at same address:");
 					Console.WriteLine(ev);
-					Console.WriteLine(rootsEvents[ev.Start]);
-					rootsEvents[ev.Start] = ev;
+					Console.WriteLine(rootsEvents[ev.RootPointer]);
+					rootsEvents[ev.RootPointer] = ev;
 				}
 			}
 
 			public override void Visit(HeapRootUnregisterEvent ev)
 			{
-				if (rootsEvents.Remove(ev.Start)) {
-					var index = rootsEventsBinary.BinarySearch(ev.Start);
+				if (rootsEvents.Remove(ev.RootPointer)) {
+					var index = rootsEventsBinary.BinarySearch(ev.RootPointer);
 					rootsEventsBinary.RemoveAt(index);
 				} else {
 					Console.WriteLine("HeapRootUnregisterEvent attempted at address that was not Registred:");
@@ -300,10 +296,6 @@ namespace Krofiler
 				return "<no name>";
 			}
 		}
-
-
-		Heapshot currentHeapshot;
-		List<Heapshot> heapshots = new List<Heapshot>();
 
 		public Dictionary<long, string> methodsNames = new Dictionary<long, string>();
 

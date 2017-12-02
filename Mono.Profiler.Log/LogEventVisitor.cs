@@ -5,15 +5,6 @@
 namespace Mono.Profiler.Log {
 
 	public abstract class LogEventVisitor {
-
-		public virtual void VisitBefore (LogEvent ev)
-		{
-		}
-
-		public virtual void VisitAfter (LogEvent ev)
-		{
-		}
-
 		public virtual void Visit (AppDomainLoadEvent ev)
 		{
 		}
@@ -63,6 +54,10 @@ namespace Mono.Profiler.Log {
 		}
 
 		public virtual void Visit (ClassLoadEvent ev)
+		{
+		}
+
+		public virtual void Visit (VTableLoadEvent ev)
 		{
 		}
 

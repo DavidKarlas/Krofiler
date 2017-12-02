@@ -124,7 +124,7 @@ namespace Krofiler
 
 		private void CounterSamplesAdded(CounterSamplesEvent obj)
 		{
-			Application.Instance.Invoke(delegate {
+			Application.Instance.AsyncInvoke(delegate {
 				var row = new CountersRow();
 				row.time = obj.Time;
 				foreach (var item in obj.Samples) {

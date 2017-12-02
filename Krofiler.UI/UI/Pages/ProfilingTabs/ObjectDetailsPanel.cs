@@ -66,11 +66,11 @@ namespace Krofiler
 					var typeName = session.GetTypeName(objInfo.TypeId);
 					listBox.Items.Add(new RetentionItem(typeName, objInfo));//TODO: Add field to name
 				}
-				listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last().Target].Message, heapshot.ObjectsInfoMap[path.Last().Target]));
+				listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last().Target].Name, heapshot.ObjectsInfoMap[path.Last().Target]));
 			}
 			if (!pathsToRoot.Any())
 				if (heapshot.Roots.TryGetValue(objectInfo.ObjAddr, out var root))
-					AddSingleEntry("Object is root itself:" + root.Message);
+					AddSingleEntry("Object is root itself:" + root.Name);
 				else
 					AddSingleEntry("This is weird... Couldn't find path to root");
 
