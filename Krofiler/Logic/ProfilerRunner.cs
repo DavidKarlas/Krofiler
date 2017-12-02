@@ -13,7 +13,7 @@ namespace Krofiler
 
 		internal void Start(string exePath, ProfileAppOptions options)
 		{
-			LogFilePath =  Path.Combine(options.OutputDir, Path.GetRandomFileName() + ".mlpd");
+			LogFilePath = Path.Combine(options.OutputDir, $"{Path.GetFileName(exePath)}_{DateTime.Now.ToString("yyyy-MM-dd__HH-mm-ss")}.mlpd");
 			profileProcess = new Process();
 			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
 			profileProcess.StartInfo.Arguments = $"--profile=log:heapshot=ondemand,alloc,nocalls,maxframes={options.MaxFrames},output=\"{LogFilePath}\" \"{exePath}\"";

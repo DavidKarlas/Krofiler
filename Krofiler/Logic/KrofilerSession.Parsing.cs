@@ -118,17 +118,17 @@ namespace Krofiler
 
 			public override void Visit(AllocationEvent ev)
 			{
-				return;
 				allocationsTracker[ev.ObjectPointer] = ev;
 			}
 
 			public override void Visit(GCMoveEvent ev)
 			{
-				return;
 				for (int i = 0; i < ev.NewObjectPointers.Count; i++) {
 					if (allocationsTracker.TryGetValue(ev.OldObjectPointers[i], out var allocation)) {
 						allocationsTracker[ev.NewObjectPointers[i]] = allocation;
 						allocationsTracker.Remove(ev.OldObjectPointers[i]);
+					} else {
+						Console.WriteLine("Scary stuff, moving something that doesn't exist.");
 					}
 				}
 			}
@@ -146,7 +146,6 @@ namespace Krofiler
 			public override void Visit(HeapEndEvent ev)
 			{
 				processingHeapTime.Stop();
-				Console.WriteLine($"It took {processingHeapTime.Elapsed} to procees heapshot {heapshotCounter}.");
 				var deadAllocations = new HashSet<long>();
 				foreach (var key in allocationsTracker.Keys)
 					if (!currentHeapshot.ObjectsInfoMap.ContainsKey(key))
@@ -169,14 +168,16 @@ namespace Krofiler
 					return;
 				}
 
-				var obj = new ObjectInfo();
-				if (allocationsTracker.Count > 0)
+				var obj = new ObjectInfo();try {
 					obj.Allocation = allocationsTracker[ev.ObjectPointer];
+				}catch{
+					obj.Allocation = new AllocationEvent() {
+
+					};
+					Console.WriteLine("OMG:" + ev.ObjectPointer);
+				}
 				obj.ObjAddr = ev.ObjectPointer;
-				if (vtableToClass.ContainsKey(ev.VTablePointer))
-					obj.TypeId = vtableToClass[ev.VTablePointer];
-				else
-					Console.WriteLine(ev.VTablePointer);
+				obj.TypeId = vtableToClass[ev.VTablePointer];
 				obj.ReferencesTo = ev.References.Select(r => r.ObjectPointer).ToArray();
 				obj.ReferencesAt = ev.References.Select(r => (ushort)r.Offset).ToArray();
 				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(obj.TypeId))
@@ -192,7 +193,7 @@ namespace Krofiler
 				vtableToClass[ev.VTablePointer] = ev.ClassPointer;
 			}
 
-            public override void Visit(ClassLoadEvent ev)
+			public override void Visit(ClassLoadEvent ev)
 			{
 				session.classIdToName[ev.ClassPointer] = ev.Name;
 			}

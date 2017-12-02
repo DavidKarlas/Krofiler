@@ -28,14 +28,7 @@ namespace Mono.Profiler.Log {
 
 		public byte[] ReadBytes (int count)
 		{
-			var bytes = new byte [count];
-
-			// BinaryReader.ReadBytes doesn't necessarily read the specified
-			// amount of bytes, so just do it this way.
-			for (var i = 0; i < bytes.Length; i++)
-				bytes [i] = ReadByte ();
-
-			return bytes;
+			return _reader.ReadBytes(count);
 		}
 
 		public byte ReadByte ()

@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -58,8 +59,10 @@ namespace Mono.Profiler.Log
 			}
 		}
 		bool live;
+		bool fileFinished;
 		CancellationToken token;
-		AutoResetEvent eventsReady = new AutoResetEvent(false);
+		ManualResetEvent eventsReady = new ManualResetEvent(false);
+		ManualResetEvent needMoreEvents = new ManualResetEvent(false);
 		ConcurrentQueue<List<LogEvent>> queue = new ConcurrentQueue<List<LogEvent>>();
 		ObjectPool<List<LogEvent>> listsPool = new ObjectPool<List<LogEvent>>(() => new List<LogEvent>());
 
@@ -73,15 +76,21 @@ namespace Mono.Profiler.Log
 			this.live = live;
 			this.token = token;
 			var visitor = Visitor;
-			while (!token.IsCancellationRequested) {
+			while (!this.token.IsCancellationRequested) {
 				if (queue.TryDequeue(out var list)) {
 					foreach (var item in list) {
 						item.Accept(visitor);
 					}
 					list.Clear();
 					listsPool.PutObject(list);
+					if (queue.Count == 15)
+						needMoreEvents.Set();
 				} else {
-					eventsReady.WaitOne(1000);
+					if (queue.IsEmpty && fileFinished)
+						return;
+					needMoreEvents.Set();
+					eventsReady.Reset();
+					eventsReady.WaitOne();
 				}
 			}
 		}
@@ -92,21 +101,25 @@ namespace Mono.Profiler.Log
 
 			StreamHeader = new LogStreamHeader(_reader);
 			var avaibleWorkers = new Queue<Worker>();
-			for (int i = 0; i < System.Math.Min(8, System.Math.Max(2, Environment.ProcessorCount - 1)); i++) {
+			for (int i = 0; i < 3; i++) {
 				avaibleWorkers.Enqueue(new Worker(token, this));
 			}
 			var workingWorkers = new List<Worker>();
 			var unreportedEvents = new Dictionary<int, List<LogEvent>>();
 			int bufferId = 0;
 			int lastReportedId = 0;
-			var oldStreamLenght = Stream.Length;
-			while ((live || (Stream.Position < Stream.Length)) && !token.IsCancellationRequested) {
-				if (oldStreamLenght != Stream.Length)
-					live = true;//Oh, looks like we opened .mlpd of live process, don't finish when end is reached.
+			startLength = Stream.Length;
+			while (true) {
 				while (avaibleWorkers.Count > 0) {
-					Wait(48, live, token);
+					if (!Wait(48)) {
+						avaibleWorkers.Dequeue().Stop();
+						continue;
+					}
 					var _bufferHeader = new LogBufferHeader(StreamHeader, _reader);
-					Wait(_bufferHeader.Length, live, token);
+					if (!Wait(_bufferHeader.Length)) {
+						avaibleWorkers.Dequeue().Stop();
+						continue;
+					}
 					var worker = avaibleWorkers.Dequeue();
 					worker.BufferId = bufferId++;
 					worker.bufferHeader = _bufferHeader;
@@ -119,17 +132,27 @@ namespace Mono.Profiler.Log
 					workingWorkers.Add(worker);
 					worker.StartWork();
 				}
-
-				var finishedIndex = Task.WaitAny(workingWorkers.Select(w => w.done.Task).ToArray());
-				var doneWorker = workingWorkers[finishedIndex];
-				workingWorkers.Remove(doneWorker);
-				unreportedEvents.Add(doneWorker.BufferId, doneWorker.list);
-				while (unreportedEvents.ContainsKey(lastReportedId)) {
-					queue.Enqueue(unreportedEvents[lastReportedId]);
+				if (workingWorkers.Count == 0) {
+					fileFinished = true;
 					eventsReady.Set();
-					unreportedEvents.Remove(lastReportedId++);
+					return;
 				}
-				avaibleWorkers.Enqueue(doneWorker);
+				if (queue.Count > 20) {
+					needMoreEvents.Reset();
+					needMoreEvents.WaitOne();
+				}
+				foreach (var workingWorker in workingWorkers.ToArray()) {
+					if (workingWorker.done.Task.IsCompleted) {
+						workingWorkers.Remove(workingWorker);
+						unreportedEvents.Add(workingWorker.BufferId, workingWorker.list);
+						while (unreportedEvents.ContainsKey(lastReportedId)) {
+							queue.Enqueue(unreportedEvents[lastReportedId]);
+							eventsReady.Set();
+							unreportedEvents.Remove(lastReportedId++);
+						}
+						avaibleWorkers.Enqueue(workingWorker);
+					}
+				}
 			}
 		}
 
@@ -138,23 +161,35 @@ namespace Mono.Profiler.Log
 		{
 			public void StartWork()
 			{
-				WaitForWork.Set();
+				if (thread == null) {
+					thread = new Thread(new ThreadStart(Loop));
+					thread.Start();
+				} else {
+					WaitForWork.Set();
+				}
 			}
 
 			void Loop()
 			{
 				while (!token.IsCancellationRequested) {
-					WaitForWork.WaitOne();
 					using (var reader = new LogReader(memoryStream, true)) {
 						while (memoryStream.Position < memoryStream.Length) {
 							list.Add(processor.ReadEvent(reader, bufferHeader));
 						}
 						done.SetResult(true);
 					}
+					WaitForWork.WaitOne();
 				}
 			}
+
+			internal void Stop()
+			{
+				cancellationTokenSource.Cancel();
+				WaitForWork.Set();
+			}
+
 			internal TaskCompletionSource<bool> done;
-			internal Thread Thread;
+			internal Thread thread;
 			internal List<LogEvent> list;
 			internal MemoryStream memoryStream = new MemoryStream(4096 * 16);
 			internal AutoResetEvent WaitForWork = new AutoResetEvent(false);
@@ -162,25 +197,29 @@ namespace Mono.Profiler.Log
 			internal LogBufferHeader bufferHeader;
 			private CancellationToken token;
 			readonly LogProcessor processor;
+			CancellationTokenSource cancellationTokenSource;
 
 			public Worker(CancellationToken token, LogProcessor processor)
 			{
+				cancellationTokenSource = new CancellationTokenSource();
+				token.Register(cancellationTokenSource.Cancel);
 				this.processor = processor;
-				this.token = token;
-				Thread = new Thread(new ThreadStart(Loop));
-				Thread.Start();
+				this.token = cancellationTokenSource.Token;
 			}
 		}
-
-		private void Wait(int requestedBytes, bool live, CancellationToken cancelation)
+		long startLength;
+		private bool Wait(int requestedBytes)
 		{
 			while (Stream.Length - Stream.Position < requestedBytes) {
-				if (live) {
-					cancelation.ThrowIfCancellationRequested();
+				if (live || Stream.Length != startLength) {
+					live = true;
+					if (token.IsCancellationRequested)
+						return false;
 					Thread.Sleep(100);
 				} else
-					throw new EndOfStreamException();
+					return false;
 			}
+			return true;
 		}
 
 		LogEvent ReadEvent(LogReader _reader, LogBufferHeader _bufferHeader)

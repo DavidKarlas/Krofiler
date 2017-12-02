@@ -10,7 +10,7 @@ namespace Prototype
 		public static void Main(string[] args)
 		{
 			var sw = Stopwatch.StartNew();
-			var session = KrofilerSession.CreateFromFile("/Users/davidkarlas/Desktop/yddu1nk9.4hj.mlpd");
+			var session = KrofilerSession.CreateFromFile("/Users/davidkarlas/Desktop/MonoDevelop.exe_2017-12-02__21-58-52.mlpd");
 			session.NewHeapshot += (s, e) => {
 				Console.WriteLine("GAGA:" + sw.Elapsed);
 				var hs = e;
