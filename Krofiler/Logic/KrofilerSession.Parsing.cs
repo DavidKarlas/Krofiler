@@ -168,13 +168,12 @@ namespace Krofiler
 					return;
 				}
 
-				var obj = new ObjectInfo();try {
+				var obj = new ObjectInfo();
+				try {
 					obj.Allocation = allocationsTracker[ev.ObjectPointer];
-				}catch{
-					obj.Allocation = new AllocationEvent() {
-
-					};
-					Console.WriteLine("OMG:" + ev.ObjectPointer);
+				} catch {
+					obj.Allocation = new AllocationEvent();
+					Console.WriteLine("OMG:" + session.classIdToName[vtableToClass[ev.VTablePointer]]);
 				}
 				obj.ObjAddr = ev.ObjectPointer;
 				obj.TypeId = vtableToClass[ev.VTablePointer];
