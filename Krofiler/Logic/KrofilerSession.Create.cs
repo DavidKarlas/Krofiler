@@ -19,11 +19,11 @@ namespace Krofiler
 			return session;
 		}
 
-		public static KrofilerSession CreateFromProcess(string executableName, ProfileAppOptions options)
+		public static KrofilerSession CreateFromProcess(string executableName, string args, ProfileAppOptions options)
 		{
 			var session = new KrofilerSession();
 			session.runner = new ProfilerRunner();
-			session.runner.Start(executableName, options);
+			session.runner.Start(executableName, args, options);
 			session.fileToProcess = session.runner.LogFilePath;
 			return session;
 		}

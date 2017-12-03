@@ -87,7 +87,8 @@ namespace Krofiler
 			Settings.Instance.RecentlyProfiledApps.Insert(0, exeName);
 			Settings.Instance.Save();
 			StartProfiling(new StartProfilingProcessInfo() {
-				ExePath = exeName
+				ExePath = exeName,
+				Args = ""
 			});
 		}
 

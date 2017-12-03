@@ -119,7 +119,7 @@ namespace Krofiler
 		{
 			if (profilingInfo is StartProfilingProcessInfo) {
 				var options = OpenOptionsDialog();
-				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath, options);
+				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath, ((StartProfilingProcessInfo)profilingInfo).Args, options);
 				Settings.Instance.RecentlyRecordedFiles.Remove(CurrentSession.MlpdPath);
 				Settings.Instance.RecentlyRecordedFiles.Insert(0, CurrentSession.MlpdPath);
 				Settings.Instance.Save();
@@ -187,6 +187,20 @@ namespace Krofiler
 
 		void HandleNewHeapshot(KrofilerSession session, Heapshot hs)
 		{
+			//hs.BuildReferencesFrom();
+			//Console.WriteLine("Hs:" + hs.Name);
+			//Console.WriteLine("Objects Count:" + hs.ObjectsInfoMap.Count);
+			//int count = 0;
+			//foreach (var obj in hs.ObjectsInfoMap.Values) {
+			//	if (obj.ReferencesFrom.Count == 0 && !hs.Roots.ContainsKey(obj.ObjAddr)) {
+			//		count++;
+			//		Console.WriteLine($"{obj.ObjAddr} type:{session.GetTypeName(obj.TypeId)}");
+			//		foreach (var b in obj.Allocation.Backtrace) {
+			//			Console.WriteLine("   " + session.GetMethodName(b));
+			//		}
+			//	}
+			//}
+			//Console.WriteLine("Orphans count:" + count);
 			Application.Instance.AsyncInvoke(delegate {
 				listViewLeft.Items.Add(new ListItem() {
 					Text = hs.Name,

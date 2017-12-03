@@ -18,7 +18,8 @@ namespace Krofiler
 	public class StartProfilingProcessInfo : StartProfilingInfo
 	{
 		public string ExePath { get; set; }
-	}
+        public string Args { get; set; }
+    }
 
 	public delegate void InsertTabDelegate(IProfilingTab newTab, IProfilingTab after);
 
