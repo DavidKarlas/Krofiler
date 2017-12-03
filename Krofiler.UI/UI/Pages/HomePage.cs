@@ -83,7 +83,6 @@ namespace Krofiler
 
 		void StartProcess(string exeName)
 		{
-			Settings.Instance.RecentlyOpenedFiles.Remove(exeName);
 			Settings.Instance.RecentlyProfiledApps.Remove(exeName);
 			Settings.Instance.RecentlyProfiledApps.Insert(0, exeName);
 			Settings.Instance.Save();

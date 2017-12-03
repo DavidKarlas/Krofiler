@@ -16,7 +16,8 @@ namespace Krofiler
 		{
 			Orientation = Orientation.Horizontal;
 			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch));
-			Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
+			if (Settings.Instance.ShowPerformanceCounters)
+				Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
 			countersView.DataStore = new ObservableCollection<CountersRow>();
 			FillRandomStuff();
 		}
@@ -37,7 +38,8 @@ namespace Krofiler
 			randomStuff.Items.Add(progressBar);
 
 			var stackLayout = new StackLayout();
-			stackLayout.Items.Add(new Label { Text = "Select to compare:" });
+			stackLayout.Items.Add(new Label { Text = "Select to compare" });
+			stackLayout.Items.Add(new Label { Text = "or double click." });
 			var listBoxsSplitter = new StackLayout { Orientation = Orientation.Horizontal };
 			listViewLeft = new ListBox();
 			listViewLeft.Width = 50;
@@ -45,6 +47,14 @@ namespace Krofiler
 			listViewRight = new ListBox();
 			listViewRight.Width = 50;
 			listViewRight.Height = 300;
+			EventHandler<MouseEventArgs> eh = (s, e) => {
+				var hs = ((s as ListBox)?.SelectedValue as ListItem)?.Tag as Heapshot;
+				if (hs == null)
+					return;
+				InsertTab(new ObjectListTab(CurrentSession, hs, hs.TypesToObjectsListMap), this);
+			};
+			listViewLeft.MouseDoubleClick += eh;
+			listViewRight.MouseDoubleClick += eh;
 			listBoxsSplitter.Items.Add(listViewLeft);
 			listBoxsSplitter.Items.Add(listViewRight);
 			stackLayout.Items.Add(new StackLayoutItem(listBoxsSplitter, VerticalAlignment.Stretch, true));
@@ -110,14 +120,19 @@ namespace Krofiler
 			if (profilingInfo is StartProfilingProcessInfo) {
 				var options = OpenOptionsDialog();
 				CurrentSession = KrofilerSession.CreateFromProcess(((StartProfilingProcessInfo)profilingInfo).ExePath, options);
+				Settings.Instance.RecentlyRecordedFiles.Remove(CurrentSession.MlpdPath);
+				Settings.Instance.RecentlyRecordedFiles.Insert(0, CurrentSession.MlpdPath);
+				Settings.Instance.Save();
 			} else if (profilingInfo is StartProfilingFromFileInfo) {
 				CurrentSession = KrofilerSession.CreateFromFile(((StartProfilingFromFileInfo)profilingInfo).MlpdFilePath);
 			} else {
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
-			CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
-			CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
+			if (Settings.Instance.ShowPerformanceCounters) {
+				CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
+				CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
+			}
 			CurrentSession.UserError += UserError;
 			CurrentSession.StartParsing();
 		}
@@ -142,7 +157,7 @@ namespace Krofiler
 
 		private void CountersDescriptionsAdded()
 		{
-			Application.Instance.Invoke(delegate {
+			Application.Instance.AsyncInvoke(delegate {
 				countersView.Columns.Add(new GridColumn() {
 					Resizable = true,
 					AutoSize = true,
@@ -172,10 +187,7 @@ namespace Krofiler
 
 		void HandleNewHeapshot(KrofilerSession session, Heapshot hs)
 		{
-			Application.Instance.Invoke(delegate {
-				var hsButton = new Button {
-					Text = hs.Name
-				};
+			Application.Instance.AsyncInvoke(delegate {
 				listViewLeft.Items.Add(new ListItem() {
 					Text = hs.Name,
 					Tag = hs
@@ -184,10 +196,6 @@ namespace Krofiler
 					Text = hs.Name,
 					Tag = hs
 				});
-				hsButton.Click += delegate {
-					InsertTab(new ObjectListTab(session, hs, hs.TypesToObjectsListMap), this);
-				};
-				commandButtonsStack.Items.Add(hsButton);
 			});
 		}
 

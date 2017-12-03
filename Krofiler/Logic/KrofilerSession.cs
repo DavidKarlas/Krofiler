@@ -9,7 +9,8 @@ namespace Krofiler
 {
 	public partial class KrofilerSession
 	{
-		public event Action<KrofilerSession, Heapshot> NewHeapshot;
+		public string MlpdPath { get => fileToProcess; }
+        public event Action<KrofilerSession, Heapshot> NewHeapshot;
 		public event Action<KrofilerSession> Finished;
 		public event Action<KrofilerSession, string, string> UserError;
 	}

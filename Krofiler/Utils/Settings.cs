@@ -16,6 +16,7 @@ namespace Krofiler
 		}
 
 		public int MaxFrames { get; set; }
+		public bool ShowPerformanceCounters { get; set; }
 
 		static Settings LoadSettings()
 		{
