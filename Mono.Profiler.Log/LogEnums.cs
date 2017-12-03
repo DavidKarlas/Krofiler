@@ -168,7 +168,7 @@ namespace Mono.Profiler.Log {
 		Marshal = 11,
 		ThreadPool = 12,
 		Debugger = 13,
-		RuntimeHandle = 14,
+		Handle = 14,
 	}
 
 	// mono/profiler/log.h : MonoProfilerMonitorEvent

@@ -208,10 +208,6 @@ namespace Mono.Profiler.Log {
 	}
 
 	public sealed class AllocationEvent : LogEvent {
-
-		[Obsolete ("This field is no longer produced.")]
-		public long ClassPointer { get; internal set; }
-
 		public long VTablePointer { get; internal set; }
 
 		public long ObjectPointer { get; internal set; }
@@ -253,9 +249,6 @@ namespace Mono.Profiler.Log {
 
 		public long ObjectPointer { get; internal set; }
 
-		[Obsolete ("This field is no longer produced.")]
-		public long ClassPointer { get; internal set; }
-
 		public long VTablePointer { get; internal set; }
 
 		public long ObjectSize { get; internal set; }
@@ -275,16 +268,7 @@ namespace Mono.Profiler.Log {
 			public long AddressPointer { get; internal set; }
 
 			public long ObjectPointer { get; internal set; }
-
-			[Obsolete ("This field is no longer produced.")]
-			public LogHeapRootAttributes Attributes { get; internal set; }
-
-			[Obsolete ("This field is no longer produced.")]
-			public long ExtraInfo { get; internal set; }
 		}
-
-		[Obsolete ("This field is no longer produced.")]
-		public long MaxGenerationCollectionCount { get; internal set; }
 
 		public IReadOnlyList<HeapRoot> Roots { get; internal set; }
 
