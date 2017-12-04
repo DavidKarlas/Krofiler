@@ -72,7 +72,7 @@ namespace Krofiler
 			if (string.IsNullOrWhiteSpace(typeNameFilter))
 				typesCollection.Filter = null;
 			else
-				typesCollection.Filter = (i) => i.Item2.Contains(typeNameFilter);
+				typesCollection.Filter = (i) => i.Item2.IndexOf (typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
 		}
 
 		void CreateTypesView()
