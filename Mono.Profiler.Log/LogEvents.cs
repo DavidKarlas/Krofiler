@@ -239,21 +239,14 @@ namespace Mono.Profiler.Log {
 	}
 
 	public sealed class HeapObjectEvent : LogEvent {
-
-		public struct HeapObjectReference {
-
-			public long Offset { get; internal set; }
-
-			public long ObjectPointer { get; internal set; }
-		}
-
 		public long ObjectPointer { get; internal set; }
 
 		public long VTablePointer { get; internal set; }
 
 		public long ObjectSize { get; internal set; }
 
-		public IReadOnlyList<HeapObjectReference> References { get; internal set; }
+		public long[] ReferencesTo;
+		public ushort[] ReferencesAt;
 
 		internal override void Accept (LogEventVisitor visitor)
 		{

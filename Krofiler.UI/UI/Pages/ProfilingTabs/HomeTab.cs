@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
+using Eto.Drawing;
 using Eto.Forms;
 using Mono.Profiler.Log;
 
@@ -12,12 +14,26 @@ namespace Krofiler
 		public KrofilerSession CurrentSession;
 		ProgressBar progressBar;
 		GridView countersView = new GridView();
+		GraphView allocationsGraph = new GraphView(new GraphInfo[]{
+			new GraphInfo{ Title="Objects #",Color= Color.FromArgb(255,0,0,128)},
+			new GraphInfo{ Title="Bytes",Color= Color.FromArgb(0,0,255,128)}
+		}, TimeSpan.FromSeconds(30));
+		GraphView workingMemory = new GraphView(new GraphInfo[]{
+			new GraphInfo{ Title="Bytes",Color= Color.FromArgb(255,0,0,255)}
+		}, TimeSpan.Zero);
 		public HomeTab()
 		{
 			Orientation = Orientation.Horizontal;
 			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch));
 			if (Settings.Instance.ShowPerformanceCounters)
 				Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
+			else {
+				var graphsStacklayout = new Splitter() { Orientation = Orientation.Vertical };
+				graphsStacklayout.Panel1 = allocationsGraph;
+				graphsStacklayout.Panel2 = workingMemory;
+				graphsStacklayout.Position = 200;
+				Items.Add(new StackLayoutItem(graphsStacklayout, VerticalAlignment.Stretch, true));
+			}
 			countersView.DataStore = new ObservableCollection<CountersRow>();
 			FillRandomStuff();
 		}
@@ -129,23 +145,36 @@ namespace Krofiler
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
-			if (Settings.Instance.ShowPerformanceCounters) {
-				CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
-				CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
-			}
+			CurrentSession.AllocationsPerSecond += AllocationsPerSecond;
+			CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
+			CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
 			CurrentSession.UserError += UserError;
 			CurrentSession.StartParsing();
 		}
 
+		private void AllocationsPerSecond(KrofilerSession session, TimeSpan time, double objects, double bytes)
+		{
+			Application.Instance.AsyncInvoke(delegate {
+				allocationsGraph.AddSample(time, objects, bytes);
+			});
+		}
+		double currentWorkingSet = 0;
 		private void CounterSamplesAdded(CounterSamplesEvent obj)
 		{
 			Application.Instance.AsyncInvoke(delegate {
-				var row = new CountersRow();
-				row.time = obj.Time;
-				foreach (var item in obj.Samples) {
-					row.Counters[item.Index] = item.Value;
+				if (Settings.Instance.ShowPerformanceCounters) {
+					var row = new CountersRow();
+					row.time = obj.Time;
+					foreach (var item in obj.Samples) {
+						row.Counters[item.Index] = item.Value;
+					}
+						((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
+				} else {
+					var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
+					if (workingSetValue != null)
+						currentWorkingSet += (double)(long)workingSetValue;
+					workingMemory.AddSample(obj.Time, currentWorkingSet);
 				}
-				((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
 			});
 		}
 
@@ -158,22 +187,24 @@ namespace Krofiler
 		private void CountersDescriptionsAdded()
 		{
 			Application.Instance.AsyncInvoke(delegate {
-				countersView.Columns.Add(new GridColumn() {
-					Resizable = true,
-					AutoSize = true,
-					Editable = false,
-					HeaderText = "Time sice start",
-					DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
-				});
-				foreach (var item in CurrentSession.Descriptions) {
+				if (Settings.Instance.ShowPerformanceCounters) {
 					countersView.Columns.Add(new GridColumn() {
-						Resizable=true,
-						AutoSize=false,
-						Editable=false,
-						Sortable=true,
-						HeaderText = item.CounterName+$"({item.Unit}) {item.SectionName}",
-						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.Index) ? r.Counters[item.Index].ToString() : "") },
+						Resizable = true,
+						AutoSize = true,
+						Editable = false,
+						HeaderText = "Time sice start",
+						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
 					});
+					foreach (var item in CurrentSession.Descriptions) {
+						countersView.Columns.Add(new GridColumn() {
+							Resizable = true,
+							AutoSize = false,
+							Editable = false,
+							Sortable = true,
+							HeaderText = item.CounterName + $"({item.Unit}) {item.SectionName}",
+							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.Index) ? r.Counters[item.Index].ToString() : "") },
+						});
+					}
 				}
 			});
 		}

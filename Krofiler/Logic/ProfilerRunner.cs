@@ -19,7 +19,7 @@ namespace Krofiler
 			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
 			//profileProcess.StartInfo.WorkingDirectory = "/Users/davidkarlas/GIT/mono/mcs/mcs/";
 			//profileProcess.StartInfo.EnvironmentVariables["MONO_GC_PARAMS"] = "cementing";
-			profileProcess.StartInfo.Arguments = $"--profile=log:heapshot=ondemand,alloc,nocalls,maxframes={options.MaxFrames},output=\"{LogFilePath}\" \"{exePath}\" {args}";
+			profileProcess.StartInfo.Arguments = $"--profile=log:heapshot=ondemand,nodefaults,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"{LogFilePath}\" \"{exePath}\" {args}";
 			profileProcess.Start();
 		}
 

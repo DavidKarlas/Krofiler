@@ -18,6 +18,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectDetailsPanel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectsListTab.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\RetentionGraph.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Controls\GraphView.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)UI\" />

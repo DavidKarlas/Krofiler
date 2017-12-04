@@ -21,7 +21,7 @@ namespace Mono.Profiler.Log
 
 		public LogStreamHeader StreamHeader { get; private set; }
 
-		ulong startTime;
+		ulong minimalTime = ulong.MaxValue;
 
 		bool _used;
 
@@ -131,6 +131,8 @@ namespace Mono.Profiler.Log
 					worker.list = listsPool.GetObject();
 					workingWorkers.Add(worker);
 					worker.StartWork();
+					if (bufferId == 1)
+						worker.done.Task.Wait();//Temporary workaround to make sure 1st event time is set correctly
 				}
 				if (workingWorkers.Count == 0) {
 					fileFinished = true;
@@ -228,11 +230,13 @@ namespace Mono.Profiler.Log
 			var basicType = (LogEventType)(type & 0xf);
 			var extType = (LogEventType)(type & 0xf0);
 
-			var _time = ReadTime(_reader, _bufferHeader) - startTime;
+			var _time = ReadTime(_reader, _bufferHeader);
 
-			if (startTime == 0) {
-				startTime = _time;
+			if (minimalTime > _time) {
+				minimalTime = _time;
 				_time = 0;
+			} else {
+				_time = _time - minimalTime;
 			}
 			LogEvent ev = null;
 
@@ -523,16 +527,16 @@ namespace Mono.Profiler.Log
 									ObjectSize = (long)_reader.ReadULeb128(),
 								};
 
-								var list = new HeapObjectEvent.HeapObjectReference[(int)_reader.ReadULeb128()];
+								var listTo = new long[(int)_reader.ReadULeb128()];
+								var listAt = new ushort[listTo.Length];
 
-								for (var i = 0; i < list.Length; i++) {
-									list[i] = new HeapObjectEvent.HeapObjectReference {
-										Offset = (long)_reader.ReadULeb128(),
-										ObjectPointer = ReadObject(_reader, _bufferHeader),
-									};
+								for (var i = 0; i < listTo.Length; i++) {
+									listAt[i] = (ushort)_reader.ReadULeb128();
+									listTo[i] = ReadObject(_reader, _bufferHeader);
 								}
 
-								hoe.References = list;
+								hoe.ReferencesAt = listAt;
+								hoe.ReferencesTo = listTo;
 								ev = hoe;
 
 								break;

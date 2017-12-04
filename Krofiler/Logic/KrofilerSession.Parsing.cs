@@ -88,13 +88,21 @@ namespace Krofiler
 		//	}
 		//}
 
+		public event Action<KrofilerSession, TimeSpan, double, double> AllocationsPerSecond;
 
 		class KrofilerLogEventVisitor : LogEventVisitor
 		{
+			Timer timer;
 			public override void Visit(CounterDescriptionsEvent ev)
 			{
 				session.Descriptions = ev.Descriptions;
 				session.CountersDescriptionsAdded?.Invoke();
+				timer = new Timer(ProcessingTimer, null, TimeSpan.FromSeconds(0.1), TimeSpan.FromSeconds(0.1));
+			}
+
+			private void ProcessingTimer(object state)
+			{
+				ProcessAllocationsPerSecond();
 			}
 
 			public override void Visit(CounterSamplesEvent ev)
@@ -116,8 +124,28 @@ namespace Krofiler
 				this.session = session;
 			}
 
+			int lastReportedSecond = -1;
+			ulong newestSecond = 0;
+			private void ProcessAllocationsPerSecond()
+			{
+				while (lastReportedSecond + 20 < (int)newestSecond) {
+					lastReportedSecond++;
+					session.AllocationsPerSecond?.Invoke(session, TimeSpan.FromMilliseconds(lastReportedSecond*100), allocatedObjectsPerSecond[lastReportedSecond], allocatedBytesPerSecond[lastReportedSecond]);
+				}
+			}
+
+			//TODO: I'm lazy... lower this to 100 and start from begining of array once end is reached
+			uint[] allocatedObjectsPerSecond = new uint[100000];
+			uint[] allocatedBytesPerSecond = new uint[100000];
 			public override void Visit(AllocationEvent ev)
 			{
+				var sec = ev.Timestamp / 100000000;
+				if (newestSecond < sec)
+					newestSecond = sec;
+				if ((int)sec <= lastReportedSecond)
+					Console.WriteLine("Trouble in paradise!");
+				allocatedObjectsPerSecond[sec]++;
+				allocatedBytesPerSecond[sec] += (uint)ev.ObjectSize;
 				allocationsTracker[ev.ObjectPointer] = ev;
 			}
 
@@ -162,9 +190,10 @@ namespace Krofiler
 			{
 				if (ev.ObjectSize == 0) {
 					var existingObj = currentHeapshot.ObjectsInfoMap[ev.ObjectPointer];
-					//Todo: optimise to not use linq?
-					existingObj.ReferencesTo = existingObj.ReferencesTo.Concat(ev.References.Select(r => r.ObjectPointer)).ToArray();
-					existingObj.ReferencesAt = existingObj.ReferencesAt.Concat(ev.References.Select(r => (ushort)r.Offset)).ToArray();
+					Array.Resize(ref existingObj.ReferencesTo, existingObj.ReferencesTo.Length + ev.ReferencesTo.Length);
+					Array.Copy(ev.ReferencesTo, 0, existingObj.ReferencesTo, existingObj.ReferencesTo.Length - ev.ReferencesTo.Length, ev.ReferencesTo.Length);
+					Array.Resize(ref existingObj.ReferencesAt, existingObj.ReferencesAt.Length + ev.ReferencesAt.Length);
+					Array.Copy(ev.ReferencesAt, 0, existingObj.ReferencesAt, existingObj.ReferencesAt.Length - ev.ReferencesAt.Length, ev.ReferencesAt.Length);
 					return;
 				}
 
@@ -177,8 +206,8 @@ namespace Krofiler
 				}
 				obj.ObjAddr = ev.ObjectPointer;
 				obj.TypeId = vtableToClass[ev.VTablePointer];
-				obj.ReferencesTo = ev.References.Select(r => r.ObjectPointer).ToArray();
-				obj.ReferencesAt = ev.References.Select(r => (ushort)r.Offset).ToArray();
+				obj.ReferencesTo = ev.ReferencesTo;
+				obj.ReferencesAt = ev.ReferencesAt;
 				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(obj.TypeId))
 					currentHeapshot.TypesToObjectsListMap[obj.TypeId] = new List<ObjectInfo>();
 				currentHeapshot.TypesToObjectsListMap[obj.TypeId].Add(obj);
