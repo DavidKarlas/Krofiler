@@ -92,7 +92,7 @@ namespace Krofiler
 			if (string.IsNullOrWhiteSpace(typeNameFilter))
 				typesCollection.Filter = null;
 			else
-				typesCollection.Filter = (i) => i.TypeName.Contains(typeNameFilter);
+				typesCollection.Filter = (i) => i.TypeName.IndexOf (typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
 		}
 
 		GridView typesGrid;
