@@ -22,9 +22,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)Utils\XmlSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\Heapshot.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\DiffHeap.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CpuSampling\SampleWrapper.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Logic\" />
     <Folder Include="$(MSBuildThisFileDirectory)Utils\" />
+    <Folder Include="$(MSBuildThisFileDirectory)CpuSampling\" />
   </ItemGroup>
 </Project>

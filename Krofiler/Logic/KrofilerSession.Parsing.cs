@@ -54,6 +54,7 @@ namespace Krofiler
 				goto retryOpeningLogfile;
 			}
 			TcpPort = header.Port;
+			ProcessId = header.ProcessId;
 			var cancellationToken = cts.Token;
 
 			try {

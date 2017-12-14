@@ -19,6 +19,7 @@ namespace Krofiler
 		/// Read from .mldp file and used to connect to runtime to control profiler(invoke heapshot etc.)
 		/// </summary>
 		int TcpPort;
+		public int ProcessId;
 
 		TcpClient client;
 		StreamWriter writer;

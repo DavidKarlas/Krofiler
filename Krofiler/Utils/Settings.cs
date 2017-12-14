@@ -17,8 +17,9 @@ namespace Krofiler
 
 		public int MaxFrames { get; set; }
 		public bool ShowPerformanceCounters { get; set; }
+        public bool ShowGraphs { get; set; }
 
-		static Settings LoadSettings()
+        static Settings LoadSettings()
 		{
 			var settingsPath = SettingsPath();
 			var settings = new Settings();

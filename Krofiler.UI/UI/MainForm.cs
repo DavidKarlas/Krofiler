@@ -24,6 +24,7 @@ namespace Krofiler
 			};
 			var numericMaxFrames = new NumericUpDown { Value = Settings.Instance.MaxFrames, MaxValue = 32, MinValue = 0, MaximumDecimalPlaces = 0, Increment = 1 };
 			var enableCounters = new CheckBox { Checked = Settings.Instance.ShowPerformanceCounters };
+			var enableGraphs = new CheckBox { Checked = Settings.Instance.ShowGraphs };
 			window.Content = new TableLayout {
 				Spacing = new Size(5, 5), // space between each cell
 				Padding = new Padding(10, 10, 10, 10), // space around the table's sides
@@ -31,6 +32,7 @@ namespace Krofiler
 				{
 					new TableRow(new Label { Text = "Max frames" },numericMaxFrames),
 					new TableRow(new Label { Text = "Show Performance Counters" },enableCounters),
+					new TableRow(new Label { Text = "Enable graphs" },enableGraphs),
 					new TableRow(
 						new Button { Text = "Cancel", Command=new Command(delegate {
 							window.Close();
@@ -38,6 +40,7 @@ namespace Krofiler
 						 new Button { Text = "Save", Command=new Command(delegate {
 							Settings.Instance.MaxFrames=(int)numericMaxFrames.Value;
 							Settings.Instance.ShowPerformanceCounters=enableCounters.Checked??false;
+							Settings.Instance.ShowGraphs=enableGraphs.Checked??false;
 							Settings.Instance.Save();
 							window.Close();
 						}) }

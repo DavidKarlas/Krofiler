@@ -6,6 +6,7 @@ using System.Linq;
 using Eto.Drawing;
 using Eto.Forms;
 using Mono.Profiler.Log;
+using System.Threading;
 
 namespace Krofiler
 {
@@ -27,7 +28,7 @@ namespace Krofiler
 			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch));
 			if (Settings.Instance.ShowPerformanceCounters)
 				Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
-			else {
+			else if (Settings.Instance.ShowGraphs) {
 				var graphsStacklayout = new Splitter() { Orientation = Orientation.Vertical };
 				graphsStacklayout.Panel1 = allocationsGraph;
 				graphsStacklayout.Panel2 = workingMemory;
@@ -154,9 +155,11 @@ namespace Krofiler
 
 		private void AllocationsPerSecond(KrofilerSession session, TimeSpan time, double objects, double bytes)
 		{
-			Application.Instance.AsyncInvoke(delegate {
-				allocationsGraph.AddSample(time, objects, bytes);
-			});
+			if (Settings.Instance.ShowGraphs) {
+				Application.Instance.AsyncInvoke(delegate {
+					allocationsGraph.AddSample(time, objects, bytes);
+				});
+			}
 		}
 		double currentWorkingSet = 0;
 		private void CounterSamplesAdded(CounterSamplesEvent obj)
@@ -169,7 +172,7 @@ namespace Krofiler
 						row.Counters[item.Index] = item.Value;
 					}
 						((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
-				} else {
+				} else if (Settings.Instance.ShowGraphs) {
 					var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
 					if (workingSetValue != null)
 						currentWorkingSet += (double)(long)workingSetValue;
@@ -218,20 +221,6 @@ namespace Krofiler
 
 		void HandleNewHeapshot(KrofilerSession session, Heapshot hs)
 		{
-			//hs.BuildReferencesFrom();
-			//Console.WriteLine("Hs:" + hs.Name);
-			//Console.WriteLine("Objects Count:" + hs.ObjectsInfoMap.Count);
-			//int count = 0;
-			//foreach (var obj in hs.ObjectsInfoMap.Values) {
-			//	if (obj.ReferencesFrom.Count == 0 && !hs.Roots.ContainsKey(obj.ObjAddr)) {
-			//		count++;
-			//		Console.WriteLine($"{obj.ObjAddr} type:{session.GetTypeName(obj.TypeId)}");
-			//		foreach (var b in obj.Allocation.Backtrace) {
-			//			Console.WriteLine("   " + session.GetMethodName(b));
-			//		}
-			//	}
-			//}
-			//Console.WriteLine("Orphans count:" + count);
 			Application.Instance.AsyncInvoke(delegate {
 				listViewLeft.Items.Add(new ListItem() {
 					Text = hs.Name,
@@ -250,11 +239,33 @@ namespace Krofiler
 		{
 			progressBar.Value = (int)(CurrentSession.ParsingProgress * 1000);
 		}
+
+		CancellationTokenSource cpuSamplingCancelationSource;
+
 		protected override void OnLoad(EventArgs e)
 		{
 			base.OnLoad(e);
 			if (commandButtonsStack != null)
 				return;
+			var sampleCpu = new Command() {
+				MenuText = "Start CPU Sample"
+			};
+			var cpuSampleButton = new Button() {
+				Command = sampleCpu,
+				Text = "Start CPU Sample"
+			};
+			sampleCpu.Executed += async delegate {
+				if (cpuSamplingCancelationSource != null) {
+					cpuSampleButton.Text = sampleCpu.MenuText = "Start CPU Sampling";
+					cpuSamplingCancelationSource.Cancel();
+					cpuSamplingCancelationSource = null;
+				} else {
+					cpuSampleButton.Text = sampleCpu.MenuText = "Stop CPU Sampling";
+					cpuSamplingCancelationSource = new CancellationTokenSource();
+					var samplingResult = await CpuSampling.SampleWrapper.Instance.StartSampling(CurrentSession, cpuSamplingCancelationSource.Token);
+					InsertTab(new CpuSamplingTab(CurrentSession, samplingResult), this);
+				}
+			};
 			var takeHeapshot = new Command() {
 				MenuText = "Take Heapshot"
 			};
@@ -276,10 +287,12 @@ namespace Krofiler
 			this.ParentWindow.Menu.Items.Add(profilingMenu);
 			var profMenuItems = profilingMenu.Items;
 
+			//profMenuItems.Insert(0, sampleCpu);
 			profMenuItems.Insert(0, takeHeapshot);
 			profMenuItems.Insert(0, killProfilee);
 
 			commandButtonsStack = new StackLayout();
+			commandButtonsStack.Items.Add(cpuSampleButton);
 			commandButtonsStack.Items.Add(new Button() {
 				Command = takeHeapshot,
 				Text = "Take Heapshot"
