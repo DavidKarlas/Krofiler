@@ -9,10 +9,9 @@ namespace Prototype
 	{
 		public static void Main(string[] args)
 		{
-			var sw = Stopwatch.StartNew();
-			var session = KrofilerSession.CreateFromFile("/Users/davidkarlas/Desktop/MonoDevelop.exe_2017-12-02__21-58-52.mlpd");
+			Console.WriteLine("CACA:" + DateTime.Now);
+			var session = KrofilerSession.CreateFromFile("/Users/davidkarlas/Desktop/MonoDevelop.exe_2017-12-14__13-40-19.mlpd");
 			session.NewHeapshot += (s, e) => {
-				Console.WriteLine("GAGA:" + sw.Elapsed);
 				var hs = e;
 
 				hs.BuildReferencesFrom();

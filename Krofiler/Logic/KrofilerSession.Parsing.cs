@@ -118,7 +118,7 @@ namespace Krofiler
 			}
 
 			private KrofilerSession session;
-			Dictionary<long, AllocationEvent> allocationsTracker = new Dictionary<long, AllocationEvent>();
+			Dictionary<long, ulong> allocationsTracker = new Dictionary<long, ulong>();
 
 			public KrofilerLogEventVisitor(KrofilerSession session)
 			{
@@ -147,7 +147,7 @@ namespace Krofiler
 					Console.WriteLine("Trouble in paradise!");
 				allocatedObjectsPerSecond[sec]++;
 				allocatedBytesPerSecond[sec] += (uint)ev.ObjectSize;
-				allocationsTracker[ev.ObjectPointer] = ev;
+				allocationsTracker[ev.ObjectPointer] = ev.FilePointer;
 			}
 
 			public override void Visit(GCMoveEvent ev)
@@ -168,6 +168,8 @@ namespace Krofiler
 
 			public override void Visit(HeapBeginEvent ev)
 			{
+				Console.WriteLine("CACA2:" + DateTime.Now);
+				System.Environment.Exit(2);
 				processingHeapTime = Stopwatch.StartNew();
 				currentHeapshot = new Heapshot(session, ++heapshotCounter);
 			}
@@ -202,7 +204,7 @@ namespace Krofiler
 				try {
 					obj.Allocation = allocationsTracker[ev.ObjectPointer];
 				} catch {
-					obj.Allocation = new AllocationEvent();
+					obj.Allocation = 0;
 					Console.WriteLine("OMG:" + session.classIdToName[vtableToClass[ev.VTablePointer]]);
 				}
 				obj.ObjAddr = ev.ObjectPointer;

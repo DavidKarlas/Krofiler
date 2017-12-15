@@ -214,7 +214,7 @@ namespace Mono.Profiler.Log {
 
 		public long ObjectSize { get; internal set; }
 
-		public IReadOnlyList<long> Backtrace { get; internal set; }
+		public ulong FilePointer { get; set; }
 
 		internal override void Accept (LogEventVisitor visitor)
 		{

@@ -65,7 +65,8 @@ namespace Mono.Profiler.Log
 		ManualResetEvent needMoreEvents = new ManualResetEvent(false);
 		ConcurrentQueue<List<LogEvent>> queue = new ConcurrentQueue<List<LogEvent>>();
 		ObjectPool<List<LogEvent>> listsPool = new ObjectPool<List<LogEvent>>(() => new List<LogEvent>());
-
+		public string CacheFolder;
+		const int QueueSize = 100;
 		public void Process(CancellationToken token, bool live = false)
 		{
 			if (_used)
@@ -83,7 +84,7 @@ namespace Mono.Profiler.Log
 					}
 					list.Clear();
 					listsPool.PutObject(list);
-					if (queue.Count == 15)
+					if (queue.Count < QueueSize)
 						needMoreEvents.Set();
 				} else {
 					if (queue.IsEmpty && fileFinished)
@@ -101,8 +102,10 @@ namespace Mono.Profiler.Log
 
 			StreamHeader = new LogStreamHeader(_reader);
 			var avaibleWorkers = new Queue<Worker>();
-			for (int i = 0; i < 3; i++) {
-				avaibleWorkers.Enqueue(new Worker(token, this));
+			CacheFolder = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+			Directory.CreateDirectory(CacheFolder);
+			for (ulong i = ulong.MaxValue - (ulong)Environment.ProcessorCount; i < ulong.MaxValue; i++) {
+				avaibleWorkers.Enqueue(new Worker(token, this, i, CacheFolder));
 			}
 			var workingWorkers = new List<Worker>();
 			var unreportedEvents = new Dictionary<int, List<LogEvent>>();
@@ -139,7 +142,7 @@ namespace Mono.Profiler.Log
 					eventsReady.Set();
 					return;
 				}
-				if (queue.Count > 20) {
+				if (queue.Count > QueueSize) {
 					needMoreEvents.Reset();
 					needMoreEvents.WaitOne();
 				}
@@ -176,12 +179,13 @@ namespace Mono.Profiler.Log
 				while (!token.IsCancellationRequested) {
 					using (var reader = new LogReader(memoryStream, true)) {
 						while (memoryStream.Position < memoryStream.Length) {
-							list.Add(processor.ReadEvent(reader, bufferHeader));
+							list.Add(processor.ReadEvent(reader, bufferHeader, idPrefix, fileStream));
 						}
 						done.SetResult(true);
 					}
 					WaitForWork.WaitOne();
 				}
+				fileStream.Close();
 			}
 
 			internal void Stop()
@@ -200,9 +204,13 @@ namespace Mono.Profiler.Log
 			private CancellationToken token;
 			readonly LogProcessor processor;
 			CancellationTokenSource cancellationTokenSource;
+			readonly ulong idPrefix;
+			FileStream fileStream;
 
-			public Worker(CancellationToken token, LogProcessor processor)
+			public Worker(CancellationToken token, LogProcessor processor, ulong idPrefix, string folder)
 			{
+				fileStream = new FileStream(Path.Combine(folder, idPrefix.ToString() + ".krof"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+				this.idPrefix = idPrefix;
 				cancellationTokenSource = new CancellationTokenSource();
 				token.Register(cancellationTokenSource.Cancel);
 				this.processor = processor;
@@ -224,7 +232,7 @@ namespace Mono.Profiler.Log
 			return true;
 		}
 
-		LogEvent ReadEvent(LogReader _reader, LogBufferHeader _bufferHeader)
+		LogEvent ReadEvent(LogReader _reader, LogBufferHeader _bufferHeader, ulong idPrefix, FileStream fs)
 		{
 			var type = _reader.ReadByte();
 			var basicType = (LogEventType)(type & 0xf);
@@ -249,8 +257,15 @@ namespace Mono.Profiler.Log
 								VTablePointer = StreamHeader.FormatVersion >= 15 ? ReadPointer(_reader, _bufferHeader) : 0,
 								ObjectPointer = ReadObject(_reader, _bufferHeader),
 								ObjectSize = (long)_reader.ReadULeb128(),
-								Backtrace = ReadBacktrace(extType == LogEventType.AllocationBacktrace, _reader, _bufferHeader),
+								FilePointer = ((ulong)fs.Position) | idPrefix
 							};
+							fs.Write(BitConverter.GetBytes(ev.Timestamp), 0, 8);
+							if (extType == LogEventType.AllocationBacktrace) {
+								ushort length = (ushort)_reader.ReadULeb128();
+								fs.Write(BitConverter.GetBytes(length), 0, 2);
+								for (var i = 0; i < length; i++)
+									fs.Write(BitConverter.GetBytes(ReadMethod(_reader, _bufferHeader)), 0, 8);
+							}
 							break;
 						default:
 							throw new LogException($"Invalid extended event type ({extType}).");

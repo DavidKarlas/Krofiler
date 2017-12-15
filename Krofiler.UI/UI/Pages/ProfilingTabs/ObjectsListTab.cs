@@ -120,7 +120,7 @@ namespace Krofiler
 				HeaderText = "Object Id"
 			});
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.Allocation.Timestamp.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.AllocationTimestamp.ToString()) },
 				HeaderText = "Time"
 			});
 

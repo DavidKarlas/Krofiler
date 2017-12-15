@@ -12,7 +12,25 @@ namespace Krofiler
 		public long[] ReferencesTo;
 		public ushort[] ReferencesAt;
 		public List<long> ReferencesFrom = new List<long>();
-		internal AllocationEvent Allocation;
+		internal ulong Allocation;
+
+		public long[] Backtrace {
+			get {
+				throw new NotImplementedException();
+			}
+		}
+
+		public long AllocationTimestamp {
+			get {
+				throw new NotImplementedException();
+			}
+		}
+	}
+
+	public class Allocation
+	{
+		public long Time;
+		public long[] Backtrace;
 	}
 }
 
