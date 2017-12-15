@@ -162,23 +162,23 @@ namespace Krofiler
 			}
 		}
 		double currentWorkingSet = 0;
-		private void CounterSamplesAdded(CounterSamplesEvent obj)
+		private void CounterSamplesAdded(SuperEvent obj)
 		{
-			Application.Instance.AsyncInvoke(delegate {
-				if (Settings.Instance.ShowPerformanceCounters) {
-					var row = new CountersRow();
-					row.time = obj.Time;
-					foreach (var item in obj.Samples) {
-						row.Counters[item.Index] = item.Value;
-					}
-						((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
-				} else if (Settings.Instance.ShowGraphs) {
-					var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
-					if (workingSetValue != null)
-						currentWorkingSet += (double)(long)workingSetValue;
-					workingMemory.AddSample(obj.Time, currentWorkingSet);
-				}
-			});
+			//Application.Instance.AsyncInvoke(delegate {
+			//	if (Settings.Instance.ShowPerformanceCounters) {
+			//		var row = new CountersRow();
+			//		row.time = obj.Time;
+			//		foreach (var item in obj.Samples) {
+			//			row.Counters[item.Index] = item.Value;
+			//		}
+			//			((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
+			//	} else if (Settings.Instance.ShowGraphs) {
+			//		var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
+			//		if (workingSetValue != null)
+			//			currentWorkingSet += (double)(long)workingSetValue;
+			//		workingMemory.AddSample(obj.Time, currentWorkingSet);
+			//	}
+			//});
 		}
 
 		class CountersRow
@@ -204,8 +204,8 @@ namespace Krofiler
 							AutoSize = false,
 							Editable = false,
 							Sortable = true,
-							HeaderText = item.CounterName + $"({item.Unit}) {item.SectionName}",
-							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.Index) ? r.Counters[item.Index].ToString() : "") },
+							HeaderText = item.GetCounterName(CurrentSession.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(CurrentSession.processor)}",
+							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index) ? r.Counters[item.CounterDescriptionsEvent_Index].ToString() : "") },
 						});
 					}
 				}

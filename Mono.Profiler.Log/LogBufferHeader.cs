@@ -2,9 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+
 namespace Mono.Profiler.Log {
 
-	public sealed class LogBufferHeader {
+	public unsafe sealed class LogBufferHeader {
 
 		const int Id = 0x4d504c01;
 
@@ -22,12 +24,17 @@ namespace Mono.Profiler.Log {
 
 		public long MethodBase { get; }
 
-		internal ulong CurrentTime { get; set; }
+		internal ulong CurrentTime;
 
 		internal long CurrentMethod { get; set; }
 
-		internal LogBufferHeader (LogStreamHeader streamHeader, LogReader reader)
+		readonly byte* bufferStart;
+		readonly ulong streamPosition;
+
+		unsafe internal LogBufferHeader (LogStreamHeader streamHeader, LogReader reader, ulong position, byte* bufferStart)
 		{
+			this.streamPosition = position;
+			this.bufferStart = bufferStart;
 			StreamHeader = streamHeader;
 
 			var id = reader.ReadInt32 ();
@@ -41,6 +48,11 @@ namespace Mono.Profiler.Log {
 			ObjectBase = reader.ReadInt64 ();
 			ThreadId = reader.ReadInt64 ();
 			MethodBase = CurrentMethod = reader.ReadInt64 ();
+		}
+
+		internal unsafe ulong GetFileOffset(byte* pos)
+		{
+			return streamPosition + (ulong)(pos - bufferStart);
 		}
 	}
 }

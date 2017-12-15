@@ -24,7 +24,7 @@ namespace Krofiler
 	{
 		public Dictionary<long, List<ObjectInfo>> TypesToObjectsListMap = new Dictionary<long, List<ObjectInfo>>();
 		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
-		public Dictionary<long, HeapRootRegisterEvent> Roots = new Dictionary<long, HeapRootRegisterEvent>();
+		public Dictionary<long, SuperEvent> Roots = new Dictionary<long, SuperEvent>();
 
 		public string Name {
 			get {

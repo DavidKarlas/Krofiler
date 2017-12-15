@@ -11,7 +11,6 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)LogBufferHeader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogEnums.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)LogEvent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogEvents.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogEventVisitor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LogException.cs" />

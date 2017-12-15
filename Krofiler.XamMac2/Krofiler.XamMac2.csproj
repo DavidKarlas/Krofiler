@@ -34,6 +34,7 @@
     <CodeSignResourceRules></CodeSignResourceRules>
     <NoStdLib>false</NoStdLib>
     <AOTMode>None</AOTMode>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -53,6 +54,7 @@
     <HttpClientHandler>HttpClientHandler</HttpClientHandler>
     <NoStdLib>false</NoStdLib>
     <AOTMode>None</AOTMode>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

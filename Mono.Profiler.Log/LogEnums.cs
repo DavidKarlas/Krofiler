@@ -7,7 +7,7 @@ using System;
 namespace Mono.Profiler.Log {
 
 	// mono/profiler/log.h : TYPE_*
-	enum LogEventType {
+	public enum LogEventType {
 		Allocation = 0,
 		GC = 1,
 		Metadata = 2,
@@ -152,7 +152,7 @@ namespace Mono.Profiler.Log {
 	}
 
 	// mono/metadata/mono-gc.h : MonoGCRootSource
-	public enum LogHeapRootSource {
+	public enum LogHeapRootSource : int {
 		External = 0,
 		Stack = 1,
 		FinalizerQueue = 2,
