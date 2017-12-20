@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Mono.Profiler.Log;
 using QuickGraph;
 using QuickGraph.Algorithms.Observers;
 using QuickGraph.Algorithms.Search;
+using SQLitePCL;
 
 namespace Krofiler
 {
@@ -22,9 +25,53 @@ namespace Krofiler
 
 	public class Heapshot : IVertexListGraph<long, ReferenceEdge>
 	{
-		public Dictionary<long, List<ObjectInfo>> TypesToObjectsListMap = new Dictionary<long, List<ObjectInfo>>();
+		public Dictionary<long, List<long>> TypesToObjectsListMap = new Dictionary<long, List<long>>();
 		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
 		public Dictionary<long, SuperEvent> Roots = new Dictionary<long, SuperEvent>();
+		sqlite3 db;
+		sqlite3_stmt stmt;
+
+		private static void check_ok(sqlite3 db, int rc)
+		{
+			if (raw.SQLITE_OK != rc)
+				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
+		}
+
+		void GenerateStmt()
+		{
+			if (stmt != null)
+				return;
+			var rc = raw.sqlite3_open_v2($"file:{Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db")}", out db, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READONLY, null);
+			if (rc != raw.SQLITE_OK)
+				throw new Exception(raw.sqlite3_errstr(rc));
+
+			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressFrom FROM Refs WHERE AddressTo=?", out stmt));
+		}
+		Dictionary<long, List<long>> ReferencedFromCache = new Dictionary<long, List<long>>();
+		public List<long> GetReferencedFrom(long objAddr)
+		{
+			if (ReferencedFromCache.TryGetValue(objAddr, out var list))
+				return list;
+			GenerateStmt();
+			check_ok(db, raw.sqlite3_bind_int64(stmt, 1, objAddr));
+			list = new List<long>();
+			while (raw.sqlite3_step(stmt) == raw.SQLITE_ROW) {
+				list.Add(raw.sqlite3_column_int64(stmt, 0));
+			}
+			check_ok(db, raw.sqlite3_reset(stmt));
+			ReferencedFromCache[objAddr] = list;
+			return list;
+		}
+
+		public sqlite3_stmt GetStmt()
+		{
+			return stmt;
+		}
+
+		public sqlite3 GetDb()
+		{
+			return db;
+		}
 
 		public string Name {
 			get {
@@ -41,23 +88,8 @@ namespace Krofiler
 			Session = session;
 		}
 
-		public void BuildReferencesFrom()
-		{
-			if (referencesFromBuilt) {
-				return;
-			}
-			referencesFromBuilt = true;
-			var listOfReferences = new List<long>();
-			foreach (var obj in ObjectsInfoMap.Values) {
-				foreach (var r in obj.ReferencesTo)
-					ObjectsInfoMap[r].ReferencesFrom.Add(obj.ObjAddr);
-			}
-		}
-
-
 		List<IEnumerable<ReferenceEdge>> cachedResult;
 		long cachedAddr;
-		bool referencesFromBuilt=false;
 		public List<IEnumerable<ReferenceEdge>> GetTop5PathsToRoots (long addr)
 		{
 			if (cachedAddr == addr && cachedResult != null)
@@ -68,7 +100,6 @@ namespace Krofiler
 			{
 				return cachedResult;
 			}
-			BuildReferencesFrom();
 			var result = new List<List<ReferenceEdge>> ();
 			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge> (this);
 			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge> ();
@@ -129,7 +160,7 @@ namespace Krofiler
 
 		public bool ContainsEdge(long source, long target)
 		{
-			return ObjectsInfoMap[source].ReferencesFrom.Contains(target);
+			return GetReferencedFrom(source).Contains(target);
 		}
 
 		public bool ContainsVertex(long vertex)
@@ -139,29 +170,29 @@ namespace Krofiler
 
 		public bool IsOutEdgesEmpty(long v)
 		{
-			return ObjectsInfoMap[v].ReferencesFrom.Count == 0;
+			return GetReferencedFrom(v).Count == 0;
 		}
 
 		public int OutDegree(long v)
 		{
-			return ObjectsInfoMap[v].ReferencesFrom.Count;
+			return GetReferencedFrom(v).Count;
 		}
 
 		public ReferenceEdge OutEdge(long v, int index)
 		{
-			return new ReferenceEdge(v, ObjectsInfoMap[v].ReferencesFrom[index]);
+			return new ReferenceEdge(v, GetReferencedFrom(v)[index]);
 		}
 
 		public IEnumerable<ReferenceEdge> OutEdges(long v)
 		{
-			foreach (var r in ObjectsInfoMap[v].ReferencesFrom) {
+			foreach (var r in GetReferencedFrom(v)) {
 				yield return new ReferenceEdge(v, r);
 			}
 		}
 
 		public bool TryGetEdge(long source, long target, out ReferenceEdge edge)
 		{
-			if (ObjectsInfoMap[source].ReferencesFrom.Contains(target)) {
+			if (GetReferencedFrom(source).Contains(target)) {
 				edge = default(ReferenceEdge);
 				return false;
 			}

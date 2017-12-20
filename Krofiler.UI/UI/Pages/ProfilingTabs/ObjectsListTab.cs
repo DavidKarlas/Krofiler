@@ -16,9 +16,9 @@ namespace Krofiler
 		FilterCollection<Tuple<long, string, int>> typesCollection = new FilterCollection<Tuple<long, string, int>>();
 		string typeNameFilter;
 		ObjectDetailsPanel objectPanel;
-		readonly Dictionary<long, List<ObjectInfo>> typesToObjectsListMap;
+		readonly Dictionary<long, List<long>> typesToObjectsListMap;
 
-		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<ObjectInfo>> typesToObjectsListMap)
+		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<long>> typesToObjectsListMap)
 		{
 			this.typesToObjectsListMap = typesToObjectsListMap;
 			this.session = session;
@@ -38,7 +38,7 @@ namespace Krofiler
 				Orientation = Orientation.Horizontal
 			};
 			splitter2.SplitterWidth = 5;
-			splitter2.Panel1= objectsGrid;
+			splitter2.Panel1 = objectsGrid;
 			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
 			objectPanel.InsertTab += (a, b) => InsertTab?.Invoke(a, b ?? this);
 			splitter2.Panel2 = objectPanel;
@@ -72,7 +72,7 @@ namespace Krofiler
 			if (string.IsNullOrWhiteSpace(typeNameFilter))
 				typesCollection.Filter = null;
 			else
-				typesCollection.Filter = (i) => i.Item2.IndexOf (typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
+				typesCollection.Filter = (i) => i.Item2.IndexOf(typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
 		}
 
 		void CreateTypesView()
@@ -104,7 +104,7 @@ namespace Krofiler
 			if (selectedItem == null) {
 				return;
 			}
-			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1];
+			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1].Cast<object>();
 			objectsGrid.SelectedRows = Array.Empty<int>();
 			objectsGrid.SelectRow(0);
 		}
@@ -114,26 +114,26 @@ namespace Krofiler
 			objectsGrid = new GridView();
 			objectsGrid.AllowMultipleSelection = false;
 
-
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.ObjAddr.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<long, string>(r => r.ToString()) },
 				HeaderText = "Object Id"
 			});
-			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.AllocationTimestamp.ToString()) },
-				HeaderText = "Time"
-			});
+			//objectsGrid.Columns.Add(new GridColumn {
+			//	DataCell = new TextBoxCell { Binding = Binding.Delegate<long, string>(r => r.AllocationTimestamp(session).ToString()) },
+			//	HeaderText = "Time"
+			//});
 
 			objectsGrid.SelectedRowsChanged += ObjectsGrid_SelectedRowsChanged;
 		}
 
 		void ObjectsGrid_SelectedRowsChanged(object sender, EventArgs e)
 		{
-			var selectedItem = objectsGrid.SelectedItem as ObjectInfo;
-			if (selectedItem == null) {
-				return;
+			if (objectsGrid.SelectedItem is long objAddr) {
+				if (!heapshot.ObjectsInfoMap.TryGetValue(objAddr, out var selectedItem)) {
+					return;
+				}
+				objectPanel.Object = selectedItem;
 			}
-			objectPanel.Object = selectedItem;
 		}
 	}
 }

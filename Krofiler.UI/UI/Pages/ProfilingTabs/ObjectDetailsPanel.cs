@@ -20,7 +20,7 @@ namespace Krofiler
 				return objectInfo;
 			}
 			set {
-				if (objectInfo == value)
+				if (objectInfo.ObjAddr == value.ObjAddr)
 					return;
 				objectInfo = value;
 				OnObjectIdChanged();
@@ -37,7 +37,7 @@ namespace Krofiler
 		void OnObjectIdChanged()
 		{
 			stacktraceView.Items.Clear();
-			var sf = objectInfo.Backtrace.Reverse().Select(b => session.GetMethodName(b));
+			var sf = objectInfo.Backtrace(session).Reverse().Select(b => session.GetMethodName(b));
 			foreach (var f in sf) {
 				stacktraceView.Items.Add(f);
 			}
@@ -50,8 +50,8 @@ namespace Krofiler
 				var listBox = new ListBox();
 				listBox.MouseDoubleClick += (s, e) => {
 					if (listBox.SelectedValue is RetentionItem ri) {
-						var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<ObjectInfo>>() {
-							[ri.obj.TypeId] = new List<ObjectInfo>() { ri.obj }
+						var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<long>>() {
+							[ri.obj.TypeId] = new List<long>() { ri.obj.ObjAddr }
 						});
 						newTab.InsertTab += InsertTab;
 						InsertTab(newTab, null);
@@ -70,15 +70,15 @@ namespace Krofiler
 			}
 			if (!pathsToRoot.Any())
 				if (heapshot.Roots.TryGetValue(objectInfo.ObjAddr, out var root))
-				AddSingleEntry("Object is root itself:" + root.GetName(session.processor));
+					AddSingleEntry("Object is root itself:" + root.GetName(session.processor));
 				else
 					AddSingleEntry("This is weird... Couldn't find path to root");
 
 			referencesList.Items.Clear();
-			foreach (var r in objectInfo.ReferencesTo) {
-				var obj = heapshot.ObjectsInfoMap[r];
-				referencesList.Items.Add(new RetentionItem(session.GetTypeName(obj.TypeId) + ": " + r, obj));
-			}
+			//foreach (var r in objectInfo.ReferencesTo) {
+			//	var obj = heapshot.ObjectsInfoMap[r];
+			//	referencesList.Items.Add(new RetentionItem(session.GetTypeName(obj.TypeId) + ": " + r, obj));
+			//}
 		}
 
 		class RetentionItem : IListItem
@@ -115,8 +115,8 @@ namespace Krofiler
 			});
 			referencesList.MouseDoubleClick += (s, e) => {
 				if (referencesList.SelectedValue is RetentionItem ri) {
-					var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<ObjectInfo>>() {
-						[ri.obj.TypeId] = new List<ObjectInfo>() { ri.obj }
+					var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<long>>() {
+						[ri.obj.TypeId] = new List<long>() { ri.obj.ObjAddr }
 					});
 					newTab.InsertTab += InsertTab;
 					InsertTab(newTab, null);

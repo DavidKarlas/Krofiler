@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using SQLitePCL;
 
 namespace Mono.Profiler.Log
 {
@@ -28,11 +29,264 @@ namespace Mono.Profiler.Log
 
 		public LogProcessor(string fileName, LogEventVisitor visitor)
 		{
+			Batteries_V2.Init();
 			Stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
 			Visitor = visitor;
 		}
 
+		class ObjectPool<T>
+		{
+			private ConcurrentBag<T> _objects;
+			private Func<T> _objectGenerator;
 
+			public ObjectPool(Func<T> objectGenerator)
+			{
+				if (objectGenerator == null) throw new ArgumentNullException("objectGenerator");
+				_objects = new ConcurrentBag<T>();
+				_objectGenerator = objectGenerator;
+			}
+
+			public T GetObject()
+			{
+				T item;
+				if (_objects.TryTake(out item)) return item;
+				return _objectGenerator();
+			}
+
+			public void PutObject(T item)
+			{
+				_objects.Add(item);
+			}
+		}
+		bool live;
+		bool fileFinished;
+		CancellationToken token;
+		ManualResetEvent eventsReady = new ManualResetEvent(false);
+		ManualResetEvent needMoreEvents = new ManualResetEvent(false);
+		ConcurrentQueue<SuperEventList> queue = new ConcurrentQueue<SuperEventList>();
+		ObjectPool<SuperEventList> listsPool = new ObjectPool<SuperEventList>(() => new SuperEventList());
+		public string cacheFolder;
+		const int QueueSize = 100;
+
+		public void Process(CancellationToken token, bool live = false)
+		{
+			if (_used)
+				throw new InvalidOperationException("This log processor cannot be reused.");
+			_used = true;
+			cacheFolder = Stream.Name + "Krofiler.Cache";
+			if (Directory.Exists(cacheFolder))
+				Directory.Delete(cacheFolder, true);
+			Directory.CreateDirectory(cacheFolder);
+			var managerThread = new Thread(new ThreadStart(ParsingManager));
+			managerThread.Start();
+			this.live = live;
+			this.token = token;
+			var visitor = Visitor;
+			while (!this.token.IsCancellationRequested) {
+				if (queue.TryDequeue(out var list)) {
+					int count = list.Count;
+					var arr = list.superEventList;
+					for (int i = 0; i < count; i++) {
+						visitor.VisitSuper(arr[i]);
+					}
+					listsPool.PutObject(list);
+					if (queue.Count < QueueSize)
+						needMoreEvents.Set();
+				} else {
+					if (queue.IsEmpty && fileFinished)
+						return;
+					needMoreEvents.Set();
+					eventsReady.Reset();
+					eventsReady.WaitOne();
+				}
+			}
+		}
+		[System.Runtime.InteropServices.DllImport("e_sqlite3", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+		public static extern int sqlite3_limit(IntPtr db, int id, int newVal);
+		void ParsingManager()
+		{
+			var _reader = new LogReader(Stream, true);
+
+			StreamHeader = new LogStreamHeader(_reader);
+			var avaibleWorkers = new Queue<Worker>();
+			ulong workersCount = (ulong)Environment.ProcessorCount / 2;
+			for (ulong i = 1; i < workersCount + 1; i++) {
+				avaibleWorkers.Enqueue(new Worker(token, this, cacheFolder, i << 56));
+			}
+			var workingWorkers = new List<Worker>();
+			var unreportedEvents = new Dictionary<int, SuperEventList>();
+			int bufferId = 0;
+			int lastReportedId = 0;
+			startLength = Stream.Length;
+			sqlite3 db = null;
+			var dbNames = new List<string>();
+			var dbs = new List<sqlite3>();
+			int heapshotCounter = 0;
+			int maxAttachedDbs = 0;
+			while (true) {
+				while (avaibleWorkers.Count > 0) {
+					if (!Wait(48)) {
+						avaibleWorkers.Dequeue().Stop();
+						continue;
+					}
+					var _bufferHeader = new LogBufferHeader(StreamHeader, _reader, (ulong)(Stream.Position + 48));
+					if (!Wait(_bufferHeader.Length)) {
+						avaibleWorkers.Dequeue().Stop();
+						continue;
+					}
+					var worker = avaibleWorkers.Dequeue();
+					worker.BufferId = bufferId++;
+					worker.bufferHeader = _bufferHeader;
+					worker.bufferLength = _bufferHeader.Length;
+					if (Stream.Read(worker.buffer, 0, _bufferHeader.Length) != _bufferHeader.Length)
+						throw new InvalidOperationException();
+					worker.done = new TaskCompletionSource<bool>();
+					worker.list = listsPool.GetObject();
+					worker.list.Clear();
+					workingWorkers.Add(worker);
+					worker.StartWork();
+					if (bufferId == 1)
+						worker.done.Task.Wait();//Temporary workaround to make sure 1st event time is set correctly
+				}
+				if (workingWorkers.Count == 0) {
+					fileFinished = true;
+					eventsReady.Set();
+					return;
+				}
+				if (queue.Count > QueueSize) {
+					needMoreEvents.Reset();
+					needMoreEvents.WaitOne();
+				}
+				bool anyComplete = false;
+				for (int i = 0; i < workingWorkers.Count; i++) {
+					var workingWorker = workingWorkers[i];
+					if (workingWorker.done.Task.IsCompleted) {
+						anyComplete = true;
+						i--;
+						workingWorkers.Remove(workingWorker);
+						unreportedEvents.Add(workingWorker.BufferId, workingWorker.list);
+						while (unreportedEvents.TryGetValue(lastReportedId, out var list)) {
+							if (list.HasHeapBegin) {
+								var dbFileName = Path.Combine(cacheFolder, $"Heapshot_{++heapshotCounter}.db");
+								if (File.Exists(dbFileName))
+									File.Delete(dbFileName);
+								CreateDatabase($"file:{dbFileName}", false, out db, out var stmt);
+								maxAttachedDbs = sqlite3_limit(db.ptr, 7, -1);
+							}
+							void MergeDatabase()
+							{
+								while (dbNames.Count > 0) {
+									var howManyToAttach = System.Math.Min(dbNames.Count, maxAttachedDbs);
+									foreach (var dbname in dbNames.Take(howManyToAttach)) {
+										check_ok(db, raw.sqlite3_exec(db, $"attach 'file:{dbname}?mode=memory&cache=shared' as {dbname};"));
+									}
+									check_ok(db, raw.sqlite3_exec(db, $"BEGIN;"));
+									foreach (var dbname in dbNames.Take(howManyToAttach)) {
+										check_ok(db, raw.sqlite3_exec(db, $"insert into Refs select * from {dbname}.Refs;"));
+									}
+									check_ok(db, raw.sqlite3_exec(db, $"COMMIT;"));
+									foreach (var dbname in dbNames.Take(howManyToAttach)) {
+										check_ok(db, raw.sqlite3_exec(db, $"detach {dbname};"));
+									}
+									foreach (var d in dbs.Take(howManyToAttach))
+										check_ok(list.db, raw.sqlite3_close(d));
+									dbNames.RemoveRange(0, howManyToAttach);
+									dbs.RemoveRange(0, howManyToAttach);
+								}
+							}
+							if (list.db != null) {
+								dbNames.Add(list.dbName);
+								dbs.Add(list.db);
+								list.db = null;
+								if (maxAttachedDbs == dbNames.Count)
+									MergeDatabase();
+							}
+							if (list.HasHeapEnd) {
+								MergeDatabase();
+								Task.Factory.StartNew((param) => {
+									var ldb = (sqlite3)param;
+									check_ok(ldb, raw.sqlite3_exec(ldb, @"CREATE INDEX RefsAddressTo ON Refs (AddressTo);"));
+									check_ok(ldb, raw.sqlite3_close(ldb));
+								}, db);
+							}
+
+							queue.Enqueue(list);
+							eventsReady.Set();
+							unreportedEvents.Remove(lastReportedId++);
+						}
+						avaibleWorkers.Enqueue(workingWorker);
+					}
+				}
+				if(!anyComplete){
+					Task.WaitAny(workingWorkers.Select(w => w.done.Task).ToArray());
+				}
+			}
+		}
+
+
+		class Worker
+		{
+			public void StartWork()
+			{
+				if (thread == null) {
+					thread = new Thread(new ThreadStart(Loop));
+					thread.Start();
+				} else {
+					WaitForWork.Set();
+				}
+			}
+
+			unsafe void Loop()
+			{
+				while (!token.IsCancellationRequested) {
+					fixed (byte* startPointer = &buffer[0]) {
+						bufferHeader.bufferStart = startPointer;
+						byte* pointer = startPointer;
+						while ((pointer - startPointer) < bufferLength) {
+							processor.ReadEvent(ref pointer, list, bufferHeader, fileStream, filePrefix);
+						}
+					}
+					fileStream.Flush();
+					if (list.db != null) {
+						check_ok(list.db, raw.sqlite3_exec(list.db, "COMMIT TRANSACTION;"));
+						check_ok(list.db, raw.sqlite3_finalize(list.stmt));
+						list.stmt = null;
+					}
+					done.SetResult(true);
+					WaitForWork.WaitOne();
+				}
+			}
+
+			internal void Stop()
+			{
+				cancellationTokenSource.Cancel();
+				WaitForWork.Set();
+			}
+
+			internal TaskCompletionSource<bool> done;
+			internal Thread thread;
+			internal SuperEventList list;
+			internal int bufferLength;
+			internal byte[] buffer = new byte[4096 * 16];
+			internal FileStream fileStream;
+			internal AutoResetEvent WaitForWork = new AutoResetEvent(false);
+			internal int BufferId;
+			internal LogBufferHeader bufferHeader;
+			private CancellationToken token;
+			readonly LogProcessor processor;
+			CancellationTokenSource cancellationTokenSource;
+			readonly ulong filePrefix;
+
+			public Worker(CancellationToken token, LogProcessor processor, string cacheFolder, ulong id)
+			{
+				this.filePrefix = id;
+				cancellationTokenSource = new CancellationTokenSource();
+				token.Register(cancellationTokenSource.Cancel);
+				this.processor = processor;
+				this.token = cancellationTokenSource.Token;
+				fileStream = new FileStream(Path.Combine(cacheFolder, id.ToString() + ".krof"), FileMode.Create, FileAccess.Write, FileShare.Read);
+			}
+		}
 		long startLength;
 		private bool Wait(int requestedBytes)
 		{
@@ -46,47 +300,6 @@ namespace Mono.Profiler.Log
 					return false;
 			}
 			return true;
-		}
-
-		bool live;
-		bool fileFinished;
-		CancellationToken token;
-		public string CacheFolder;
-		const int QueueSize = 100;
-		public unsafe void Process(CancellationToken token, bool live = false)
-		{
-			if (_used)
-				throw new InvalidOperationException("This log processor cannot be reused.");
-			_used = true;
-			this.live = live;
-			this.token = token;
-
-			var _reader = new LogReader(Stream, true);
-
-			StreamHeader = new LogStreamHeader(_reader);
-			startLength = Stream.Length;
-			const int BufferSize = 4096 * 16 + 16;//+16 in case of optimisation that read ahead don't fall out
-			var Buffer = new byte[BufferSize];
-			var cacheStream = new WriteFile();
-			cacheStream.pointer = Mono.Unix.Native.Stdlib.fopen("cache.krof", "wb");
-			try {
-				fixed (byte* startPointer = &Buffer[0]) {
-					while (!this.token.IsCancellationRequested) {
-						if (!Wait(48))
-							return;
-						var _bufferHeader = new LogBufferHeader(StreamHeader, _reader, (ulong)Stream.Position, startPointer);
-						if (!Wait(_bufferHeader.Length))
-							return;
-						Stream.Read(Buffer, 0, _bufferHeader.Length);
-						var pointer = startPointer;
-						while ((pointer - startPointer) < _bufferHeader.Length) {
-							ReadEvent(ref pointer, _bufferHeader, cacheStream);
-						}
-					}
-				}
-			} finally {
-				Mono.Unix.Native.Stdlib.fclose(cacheStream.pointer);
-			}
 		}
 
 		static unsafe ulong ReadCString(ref byte* pointer, LogBufferHeader _bufferHeader)
@@ -137,14 +350,14 @@ namespace Mono.Profiler.Log
 		}
 
 
-		unsafe long ReadPointer(ref byte* span, LogBufferHeader _bufferHeader)
+		unsafe static long ReadPointer(ref byte* span, LogBufferHeader _bufferHeader)
 		{
 			var ptr = ReadSLeb128(ref span) + _bufferHeader.PointerBase;
 
-			return StreamHeader.PointerSize == sizeof(long) ? ptr : ptr & 0xffffffffL;
+			return _bufferHeader.StreamHeader.PointerSize == sizeof(long) ? ptr : ptr & 0xffffffffL;
 		}
 
-		unsafe long ReadObject(ref byte* span, LogBufferHeader _bufferHeader)
+		unsafe static long ReadObject(ref byte* span, LogBufferHeader _bufferHeader)
 		{
 			return ReadSLeb128(ref span) + _bufferHeader.ObjectBase << 3;
 		}
@@ -153,49 +366,49 @@ namespace Mono.Profiler.Log
 		{
 			return _bufferHeader.CurrentMethod += ReadSLeb128(ref _reader);
 		}
-		struct WriteFile
-		{
-			public ulong position;
-			public IntPtr pointer;
-		}
-		unsafe ulong ReadBacktrace(bool actuallyRead, ref byte* span, LogBufferHeader _bufferHeader, WriteFile fs, bool managed = true)
+
+		unsafe static ulong ReadBacktrace(bool actuallyRead, ref byte* span, LogBufferHeader _bufferHeader, FileStream fs, ulong fileId, bool managed = true)
 		{
 			if (!actuallyRead)
 				return ulong.MaxValue;
-			var posBefore = fs.position;
-			var length = (int)ReadULeb128(ref span);
-
+			var posBefore = fs.Position;
+			var length = (byte)ReadULeb128(ref span);
+			fs.WriteByte(length);
 			for (var i = 0; i < length; i++) {
 				var ptr = managed ? ReadMethod(ref span, _bufferHeader) : ReadPointer(ref span, _bufferHeader);
-				var written = Mono.Unix.Native.Stdlib.fwrite(&ptr, 8, 1, fs.pointer);
-				fs.position += written;
-				Debug.Assert(written == 8);
+				fs.Write(BitConverter.GetBytes(ptr), 0, 8);
 			}
-			return posBefore;
+			return (ulong)posBefore | fileId;
 		}
 
-		unsafe void ReadEvent(ref byte* span, LogBufferHeader _bufferHeader, WriteFile fs)
+		unsafe void ReadEvent(ref byte* span, SuperEventList list, LogBufferHeader _bufferHeader, FileStream fs, ulong filePrefix)
 		{
 			var type = *span++;
 			var basicType = (LogEventType)(type & 0xf);
 			var extType = (LogEventType)(type & 0xf0);
 
-			_bufferHeader.CurrentTime += ReadULeb128(ref span);
-
+			var _time = _bufferHeader.CurrentTime += ReadULeb128(ref span);
+			if (minimalTime > _time) {
+				minimalTime = _time;
+				_time = 0;
+			} else {
+				_time = _time - minimalTime;
+			}
+			ulong shiftedTime = _time << 8;
 			switch (basicType) {
 				case LogEventType.Allocation:
 					switch (extType) {
 						case LogEventType.AllocationBacktrace:
 						case LogEventType.AllocationNoBacktrace:
-							Visitor.VisitAllocationEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Allocation) {
 								AllocationEvent_VTablePointer = ReadPointer(ref span, _bufferHeader),
 								AllocationEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 								AllocationEvent_ObjectSize = ReadULeb128(ref span),
-								AllocationEvent_FilePointer = fs.position
+								AllocationEvent_FilePointer = (ulong)fs.Position | filePrefix
 							});
 							var time = _bufferHeader.CurrentTime;
-							Mono.Unix.Native.Stdlib.fwrite(&time, 8, 1, fs.pointer);
-							ReadBacktrace(extType == LogEventType.AllocationBacktrace, ref span, _bufferHeader, fs);
+							fs.Write(BitConverter.GetBytes(time), 0, 8);
+							ReadBacktrace(extType == LogEventType.AllocationBacktrace, ref span, _bufferHeader, fs, filePrefix);
 							break;
 						default:
 							throw new LogException($"Invalid extended event type ({extType}).");
@@ -204,56 +417,64 @@ namespace Mono.Profiler.Log
 				case LogEventType.GC:
 					switch (extType) {
 						case LogEventType.GCEvent:
-							Visitor.VisitGCEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GC) {
 								GCEvent_Type = (LogGCEvent)(byte)*span++,
 								GCEvent_Generation = *span++,
 							});
 							break;
 						case LogEventType.GCResize:
-							Visitor.VisitGCResizeEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCResize) {
 								GCResizeEvent_NewSize = (long)ReadULeb128(ref span),
 							});
 							break;
 						case LogEventType.GCMove: {
 								var length = ReadULeb128(ref span) / 2;
-
-								for (ulong i = 0; i < length; i++)
-									Visitor.VisitGCMoveEvent(new SuperEvent() {
+								if (length % 2 == 1) {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCMove) {
 										GCMoveEvent_OldObjectPointer = ReadObject(ref span, _bufferHeader),
 										GCMoveEvent_NewObjectPointer = ReadObject(ref span, _bufferHeader)
+									});
+									length--;
+								}
+								for (ulong i = 0; i < length; i += 2)
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCMove) {
+										GCMoveEvent_OldObjectPointer = ReadObject(ref span, _bufferHeader),
+										GCMoveEvent_NewObjectPointer = ReadObject(ref span, _bufferHeader),
+										GCMoveEvent_OldObjectPointer2 = ReadObject(ref span, _bufferHeader),
+										GCMoveEvent_NewObjectPointer2 = ReadObject(ref span, _bufferHeader),
 									});
 								break;
 							}
 						case LogEventType.GCHandleCreationNoBacktrace:
 						case LogEventType.GCHandleCreationBacktrace:
-							Visitor.VisitGCHandleCreationEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCHandleCreation) {
 								GCHandleCreationEvent_Type = (LogGCHandleType)ReadULeb128(ref span),
 								GCHandleCreationEvent_Handle = (long)ReadULeb128(ref span),
 								GCHandleCreationEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
-								GCHandleCreationEvent_Backtrace = ReadBacktrace(extType == LogEventType.GCHandleCreationBacktrace, ref span, _bufferHeader, fs),
+								GCHandleCreationEvent_Backtrace = ReadBacktrace(extType == LogEventType.GCHandleCreationBacktrace, ref span, _bufferHeader, fs, filePrefix),
 							});
 							break;
 						case LogEventType.GCHandleDeletionNoBacktrace:
 						case LogEventType.GCHandleDeletionBacktrace:
-							Visitor.VisitGCHandleDeletionEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCHandleDeletion) {
 								GCHandleDeletionEvent_Type = (LogGCHandleType)ReadULeb128(ref span),
 								GCHandleDeletionEvent_Handle = (long)ReadULeb128(ref span),
-								GCHandleDeletionEvent_Backtrace = ReadBacktrace(extType == LogEventType.GCHandleDeletionBacktrace, ref span, _bufferHeader, fs),
+								GCHandleDeletionEvent_Backtrace = ReadBacktrace(extType == LogEventType.GCHandleDeletionBacktrace, ref span, _bufferHeader, fs, filePrefix),
 							});
 							break;
 						case LogEventType.GCFinalizeBegin:
-							Visitor.VisitGCFinalizeBeginEvent(new SuperEvent());
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCFinalizeBegin));
 							break;
 						case LogEventType.GCFinalizeEnd:
-							Visitor.VisitGCFinalizeEndEvent(new SuperEvent());
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCFinalizeEnd));
 							break;
 						case LogEventType.GCFinalizeObjectBegin:
-							Visitor.VisitGCFinalizeObjectBeginEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCFinalizeObjectBegin) {
 								GCFinalizeObjectBeginEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 							});
 							break;
 						case LogEventType.GCFinalizeObjectEnd:
-							Visitor.VisitGCFinalizeObjectEndEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCFinalizeObjectEnd) {
 								GCFinalizeObjectEndEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 							});
 							break;
@@ -283,7 +504,7 @@ namespace Mono.Profiler.Log
 						switch (metadataType) {
 							case LogMetadataType.Class:
 								if (load) {
-									Visitor.VisitClassLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ClassLoad) {
 										ClassLoadEvent_ClassPointer = ReadPointer(ref span, _bufferHeader),
 										ClassLoadEvent_ImagePointer = ReadPointer(ref span, _bufferHeader),
 										ClassLoadEvent_Name = ReadCString(ref span, _bufferHeader),
@@ -293,12 +514,12 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.Image:
 								if (load) {
-									Visitor.VisitImageLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ImageLoad) {
 										ImageLoadEvent_ImagePointer = ReadPointer(ref span, _bufferHeader),
 										ImageLoadEvent_Name = ReadCString(ref span, _bufferHeader),
 									});
 								} else if (unload) {
-									Visitor.VisitImageUnloadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ImageUnload) {
 										ImageUnloadEvent_ImagePointer = ReadPointer(ref span, _bufferHeader),
 										ImageUnloadEvent_Name = ReadCString(ref span, _bufferHeader),
 									});
@@ -307,13 +528,13 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.Assembly:
 								if (load) {
-									Visitor.VisitAssemblyLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.AssemblyLoad) {
 										AssemblyLoadEvent_AssemblyPointer = ReadPointer(ref span, _bufferHeader),
 										AssemblyLoadEvent_ImagePointer = StreamHeader.FormatVersion >= 14 ? ReadPointer(ref span, _bufferHeader) : 0,
 										AssemblyLoadEvent_Name = ReadCString(ref span, _bufferHeader),
 									});
 								} else if (unload) {
-									Visitor.VisitAssemblyUnloadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.AssemblyUnload) {
 										AssemblyUnloadEvent_AssemblyPointer = ReadPointer(ref span, _bufferHeader),
 										AssemblyUnloadEvent_ImagePointer = StreamHeader.FormatVersion >= 14 ? ReadPointer(ref span, _bufferHeader) : 0,
 										AssemblyUnloadEvent_Name = ReadCString(ref span, _bufferHeader),
@@ -323,15 +544,15 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.AppDomain:
 								if (load) {
-									Visitor.VisitAppDomainLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.AppDomainLoad) {
 										AppDomainLoadEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 									});
 								} else if (unload) {
-									Visitor.VisitAppDomainUnloadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.AppDomainUnload) {
 										AppDomainUnloadEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 									});
 								} else {
-									Visitor.VisitAppDomainNameEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.AppDomainName) {
 										AppDomainNameEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 										AppDomainNameEvent_Name = ReadCString(ref span, _bufferHeader),
 									});
@@ -339,15 +560,15 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.Thread:
 								if (load) {
-									Visitor.VisitThreadStartEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ThreadStart) {
 										ThreadStartEvent_ThreadId = ReadPointer(ref span, _bufferHeader),
 									});
 								} else if (unload) {
-									Visitor.VisitThreadEndEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ThreadEnd) {
 										ThreadEndEvent_ThreadId = ReadPointer(ref span, _bufferHeader),
 									});
 								} else {
-									Visitor.VisitThreadNameEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ThreadName) {
 										ThreadNameEvent_ThreadId = ReadPointer(ref span, _bufferHeader),
 										ThreadNameEvent_Name = ReadCString(ref span, _bufferHeader),
 									});
@@ -355,12 +576,12 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.Context:
 								if (load) {
-									Visitor.VisitContextLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ContextLoad) {
 										ContextLoadEvent_ContextId = ReadPointer(ref span, _bufferHeader),
 										ContextLoadEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 									});
 								} else if (unload) {
-									Visitor.VisitContextUnloadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ContextUnload) {
 										ContextUnloadEvent_ContextId = ReadPointer(ref span, _bufferHeader),
 										ContextUnloadEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 									});
@@ -369,7 +590,7 @@ namespace Mono.Profiler.Log
 								break;
 							case LogMetadataType.VTable:
 								if (load) {
-									Visitor.VisitVTableLoadEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.VTableLoad) {
 										VTableLoadEvent_VTablePointer = ReadPointer(ref span, _bufferHeader),
 										VTableLoadEvent_AppDomainId = ReadPointer(ref span, _bufferHeader),
 										VTableLoadEvent_ClassPointer = ReadPointer(ref span, _bufferHeader),
@@ -385,22 +606,22 @@ namespace Mono.Profiler.Log
 				case LogEventType.Method:
 					switch (extType) {
 						case LogEventType.MethodLeave:
-							Visitor.VisitLeaveEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Leave) {
 								LeaveEvent_MethodPointer = ReadMethod(ref span, _bufferHeader),
 							});
 							break;
 						case LogEventType.MethodEnter:
-							Visitor.VisitEnterEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Enter) {
 								EnterEvent_MethodPointer = ReadMethod(ref span, _bufferHeader),
 							});
 							break;
 						case LogEventType.MethodLeaveExceptional:
-							Visitor.VisitExceptionalLeaveEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ExceptionalLeave) {
 								ExceptionalLeaveEvent_MethodPointer = ReadMethod(ref span, _bufferHeader),
 							});
 							break;
 						case LogEventType.MethodJit:
-							Visitor.VisitJitEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Jit) {
 								JitEvent_MethodPointer = ReadMethod(ref span, _bufferHeader),
 								JitEvent_CodePointer = ReadPointer(ref span, _bufferHeader),
 								JitEvent_CodeSize = (long)ReadULeb128(ref span),
@@ -415,13 +636,13 @@ namespace Mono.Profiler.Log
 					switch (extType) {
 						case LogEventType.ExceptionThrowNoBacktrace:
 						case LogEventType.ExceptionThrowBacktrace:
-							Visitor.VisitThrowEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Throw) {
 								ThrowEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
-								ThrowEvent_Backtrace = ReadBacktrace(extType == LogEventType.ExceptionThrowBacktrace, ref span, _bufferHeader, fs),
+								ThrowEvent_Backtrace = ReadBacktrace(extType == LogEventType.ExceptionThrowBacktrace, ref span, _bufferHeader, fs, filePrefix),
 							});
 							break;
 						case LogEventType.ExceptionClause:
-							Visitor.VisitExceptionClauseEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ExceptionClause) {
 								ExceptionClauseEvent_Type = (LogExceptionClause)(byte)*span++,
 								ExceptionClauseEvent_Index = (long)ReadULeb128(ref span),
 								ExceptionClauseEvent_MethodPointer = ReadMethod(ref span, _bufferHeader),
@@ -433,22 +654,13 @@ namespace Mono.Profiler.Log
 					}
 					break;
 				case LogEventType.Monitor:
-					if (StreamHeader.FormatVersion < 14) {
-						if (extType.HasFlag(LogEventType.MonitorBacktrace)) {
-							extType = LogEventType.MonitorBacktrace;
-						} else {
-							extType = LogEventType.MonitorNoBacktrace;
-						}
-					}
 					switch (extType) {
 						case LogEventType.MonitorNoBacktrace:
 						case LogEventType.MonitorBacktrace:
-							Visitor.VisitMonitorEvent(new SuperEvent() {
-								MonitorEvent_Event = StreamHeader.FormatVersion >= 14 ?
-										(LogMonitorEvent)(byte)*span++ :
-										(LogMonitorEvent)((((byte)type & 0xf0) >> 4) & 0x3),
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.Monitor) {
+								MonitorEvent_Event = (LogMonitorEvent)(byte)*span++,
 								MonitorEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
-								MonitorEvent_Backtrace = ReadBacktrace(extType == LogEventType.MonitorBacktrace, ref span, _bufferHeader, fs),
+								MonitorEvent_Backtrace = ReadBacktrace(extType == LogEventType.MonitorBacktrace, ref span, _bufferHeader, fs, filePrefix),
 							});
 							break;
 						default:
@@ -458,43 +670,51 @@ namespace Mono.Profiler.Log
 				case LogEventType.Heap:
 					switch (extType) {
 						case LogEventType.HeapBegin:
-							Visitor.VisitHeapBeginEvent(new SuperEvent());
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapBegin));
+							list.HasHeapBegin = true;
 							break;
 						case LogEventType.HeapEnd:
-							Visitor.VisitHeapEndEvent(new SuperEvent());
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapEnd));
+							list.HasHeapEnd = true;
 							break;
 						case LogEventType.HeapObject: {
-								var hoe = new SuperEvent() {
+								var hoe = new SuperEvent(shiftedTime | (byte)LogEventId.HeapObject) {
 									HeapObjectEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 									HeapObjectEvent_VTablePointer = ReadPointer(ref span, _bufferHeader),
-									HeapObjectEvent_ObjectSize = (long)ReadULeb128(ref span),
+									HeapObjectEvent_ObjectSize = (long)ReadULeb128(ref span)
 								};
 
-								var listTo = new long[(int)ReadULeb128(ref span)];
-								var listAt = new ushort[listTo.Length];
-
-								for (var i = 0; i < listTo.Length; i++) {
-									listAt[i] = (ushort)ReadULeb128(ref span);
-									listTo[i] = ReadObject(ref span, _bufferHeader);
+								var len = (int)ReadULeb128(ref span);
+								if (list.db == null) {
+									list.dbName = $"refs{_bufferHeader.streamPosition}";
+									CreateDatabase($"file:{list.dbName}?mode=memory&cache=shared", true, out list.db, out list.stmt);
 								}
-
-								//hoe.ReferencesAt = listAt;
-								//hoe.ReferencesTo = listTo;
-								Visitor.VisitHeapObjectEvent(hoe);
+								for (var i = 0; i < len; i++) {
+									var at=(long)ReadULeb128(ref span);
+									var to = ReadObject(ref span, _bufferHeader);
+									check_ok(list.db, raw.sqlite3_bind_int64(list.stmt, 1, hoe.HeapObjectEvent_ObjectPointer));
+									check_ok(list.db, raw.sqlite3_bind_int64(list.stmt, 2, at));
+									check_ok(list.db, raw.sqlite3_bind_int64(list.stmt, 3, to));
+									var result = raw.sqlite3_step(list.stmt);
+									if (raw.SQLITE_DONE != result)
+										check_ok(list.db, result);
+									check_ok(list.db, raw.sqlite3_reset(list.stmt));
+								}
+								if (hoe.HeapObjectEvent_ObjectSize > 0)
+									list.Add(hoe);
 								break;
 							}
-
 						case LogEventType.HeapRoots: {
 								var length = ReadULeb128(ref span);
 								if (length % 2 == 1) {
-									Visitor.VisitHeapRootsEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapRoots) {
 										HeapRootsEvent_AddressPointer = ReadPointer(ref span, _bufferHeader),
 										HeapRootsEvent_ObjectPointer = ReadObject(ref span, _bufferHeader)
 									});
 									length--;
 								}
 								for (ulong i = 0; i < length; i += 2) {
-									Visitor.VisitHeapRootsEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapRoots) {
 										HeapRootsEvent_AddressPointer = ReadPointer(ref span, _bufferHeader),
 										HeapRootsEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 										HeapRootsEvent_AddressPointer2 = ReadPointer(ref span, _bufferHeader),
@@ -504,7 +724,7 @@ namespace Mono.Profiler.Log
 								break;
 							}
 						case LogEventType.HeapRootRegister:
-							Visitor.VisitHeapRootRegisterEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapRootRegister) {
 								HeapRootRegisterEvent_RootPointer = ReadPointer(ref span, _bufferHeader),
 								HeapRootRegisterEvent_RootSize = (uint)ReadULeb128(ref span),
 								HeapRootRegisterEvent_Source = (LogHeapRootSource)(byte)*span++,
@@ -513,7 +733,7 @@ namespace Mono.Profiler.Log
 							});
 							break;
 						case LogEventType.HeapRootUnregister:
-							Visitor.VisitHeapRootUnregisterEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.HeapRootUnregister) {
 								HeapRootUnregisterEvent_RootPointer = ReadPointer(ref span, _bufferHeader),
 							});
 							break;
@@ -524,21 +744,21 @@ namespace Mono.Profiler.Log
 				case LogEventType.Sample:
 					switch (extType) {
 						case LogEventType.SampleHit:
-							Visitor.VisitSampleHitEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.SampleHit) {
 								SampleHitEvent_ThreadId = ReadPointer(ref span, _bufferHeader),
-								SampleHitEvent_UnmanagedBacktrace = ReadBacktrace(true, ref span, _bufferHeader, fs, false),
-								SampleHitEvent_ManagedBacktrace = ReadBacktrace(true, ref span, _bufferHeader, fs),
+								SampleHitEvent_UnmanagedBacktrace = ReadBacktrace(true, ref span, _bufferHeader, fs, filePrefix, false),
+								SampleHitEvent_ManagedBacktrace = ReadBacktrace(true, ref span, _bufferHeader, fs, filePrefix),
 							});
 							break;
 						case LogEventType.SampleUnmanagedSymbol:
-							Visitor.VisitUnmanagedSymbolEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.UnmanagedSymbol) {
 								UnmanagedSymbolEvent_CodePointer = ReadPointer(ref span, _bufferHeader),
 								UnmanagedSymbolEvent_CodeSize = (long)ReadULeb128(ref span),
 								UnmanagedSymbolEvent_Name = ReadCString(ref span, _bufferHeader),
 							});
 							break;
 						case LogEventType.SampleUnmanagedBinary:
-							Visitor.VisitUnmanagedBinaryEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.UnmanagedBinary) {
 								UnmanagedBinaryEvent_SegmentPointer = ReadPointer(ref span, _bufferHeader),
 								UnmanagedBinaryEvent_SegmentOffset = (long)ReadULeb128(ref span),
 								UnmanagedBinaryEvent_SegmentSize = (long)ReadULeb128(ref span),
@@ -549,7 +769,7 @@ namespace Mono.Profiler.Log
 								var length = (int)ReadULeb128(ref span);
 								for (var i = 0; i < length; i++) {
 									var section = ReadULeb128(ref span);
-									Visitor.VisitCounterDescriptionsEvent(new SuperEvent() {
+									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.CounterDescriptions) {
 										CounterDescriptionsEvent_SectionName = (LogCounterSection)section == LogCounterSection.User ? ReadCString(ref span, _bufferHeader) : 0,
 										CounterDescriptionsEvent_CounterName = ReadCString(ref span, _bufferHeader),
 										CounterDescriptionsEvent_SectionTypeUnitVariance = ReadULeb128(ref span) | section | ReadULeb128(ref span) | ReadULeb128(ref span),
@@ -567,34 +787,31 @@ namespace Mono.Profiler.Log
 
 									var counterType = (LogCounterType)ReadULeb128(ref span);
 
-									object value = null;
-
+									var cse = new SuperEvent(shiftedTime | (byte)LogEventId.CounterSamples) {
+										CounterSamplesEvent_Index = index,
+										CounterSamplesEvent_Type = counterType,
+									};
 									switch (counterType) {
 										case LogCounterType.String:
-											value = *span++ == 1 ? ReadCString(ref span, _bufferHeader) : 0;
+											cse.CounterSamplesEvent_Value_Ulong = *span++ == 1 ? ReadCString(ref span, _bufferHeader) : 0;
 											break;
 										case LogCounterType.Int32:
 										case LogCounterType.Word:
 										case LogCounterType.Int64:
 										case LogCounterType.Interval:
-											value = ReadSLeb128(ref span);
+											cse.CounterSamplesEvent_Value_Long = ReadSLeb128(ref span);
 											break;
 										case LogCounterType.UInt32:
 										case LogCounterType.UInt64:
-											value = ReadULeb128(ref span);
+											cse.CounterSamplesEvent_Value_Ulong = ReadULeb128(ref span);
 											break;
 										case LogCounterType.Double:
-											value = ReadDouble(ref span);
+											cse.CounterSamplesEvent_Value_Double = ReadDouble(ref span);
 											break;
 										default:
 											throw new LogException($"Invalid counter type ({counterType}).");
 									}
-
-									Visitor.VisitCounterSamplesEvent(new SuperEvent() {
-										CounterSamplesEvent_Index = index,
-										CounterSamplesEvent_Type = counterType,
-										CounterSamplesEvent_Value = value,
-									});
+									list.Add(cse);
 								}
 								break;
 							}
@@ -606,7 +823,7 @@ namespace Mono.Profiler.Log
 					switch (extType) {
 						case LogEventType.RuntimeJitHelper: {
 								var helperType = (LogJitHelper)(byte)*span++;
-								Visitor.VisitJitHelperEvent(new SuperEvent() {
+								list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.JitHelper) {
 									JitHelperEvent_Type = helperType,
 									JitHelperEvent_BufferPointer = ReadPointer(ref span, _bufferHeader),
 									JitHelperEvent_BufferSize = (long)ReadULeb128(ref span),
@@ -621,7 +838,7 @@ namespace Mono.Profiler.Log
 				case LogEventType.Meta:
 					switch (extType) {
 						case LogEventType.MetaSynchronizationPoint:
-							Visitor.VisitSynchronizationPointEvent(new SuperEvent() {
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.SynchronizationPoint) {
 								SynchronizationPointEvent_Type = (LogSynchronizationPoint)(byte)*span++,
 							});
 							break;
@@ -633,14 +850,68 @@ namespace Mono.Profiler.Log
 					throw new LogException($"Invalid basic event type ({basicType}).");
 			}
 		}
+
+		private static void check_ok(sqlite3 db, int rc)
+		{
+			if (raw.SQLITE_OK != rc)
+				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
+		}
+
+		private void CreateDatabase(string name, bool createStatement, out sqlite3 db, out sqlite3_stmt stmt)
+		{
+			var rc = raw.sqlite3_open_v2(name, out db, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE | raw.SQLITE_OPEN_CREATE, null);
+			check_ok(db, rc);
+			check_ok(db, raw.sqlite3_exec(db, @"CREATE TABLE Refs
+			(
+				AddressFrom INT NOT NULL,
+				FieldOffset INT NOT NULL,
+				AddressTo INT NOT NULL
+			)"));
+			check_ok(db, raw.sqlite3_exec(db, "PRAGMA synchronous=OFF"));
+			check_ok(db, raw.sqlite3_exec(db, "PRAGMA count_changes=OFF"));
+			check_ok(db, raw.sqlite3_exec(db, "PRAGMA journal_mode=OFF"));
+			check_ok(db, raw.sqlite3_exec(db, "PRAGMA temp_store=MEMORY"));
+			if (createStatement) {
+				check_ok(db, raw.sqlite3_exec(db, "BEGIN TRANSACTION;"));
+				check_ok(db, raw.sqlite3_prepare_v2(db, "INSERT INTO Refs(AddressFrom, FieldOffset, AddressTo) VALUES(?,?,?)", out stmt));
+			} else
+				stmt = null;
+		}
+
 		byte[] bytes = new byte[4096];
 		internal string ReadString(ulong position)
 		{
 			using (var fs = new FileStream(Stream.Name, FileMode.Open, FileAccess.Read, FileShare.Read)) {
 				fs.Position = (long)position;
 				var read = fs.Read(bytes, 0, bytes.Length);
-				while (bytes[position++] != 0) { }
-				return Encoding.UTF8.GetString(bytes, 0, (int)position);
+				var zeroPosition = 0;
+				while (zeroPosition < bytes.Length && bytes[zeroPosition++] != 0) { }
+				return Encoding.UTF8.GetString(bytes, 0, zeroPosition - 1);
+			}
+		}
+
+		private class SuperEventList
+		{
+			public bool HasHeapBegin;
+			public bool HasHeapEnd;
+			public sqlite3 db;
+			public sqlite3_stmt stmt;
+			private int count = 0;
+			public SuperEvent[] superEventList = new SuperEvent[10000];
+			public string dbName;
+
+			public int Count { get => count; }
+
+			internal void Add(SuperEvent superEvent)
+			{
+				superEventList[count++] = superEvent;
+			}
+
+			internal void Clear()
+			{
+				count = 0;
+				HasHeapBegin = false;
+				HasHeapEnd = false;
 			}
 		}
 	}

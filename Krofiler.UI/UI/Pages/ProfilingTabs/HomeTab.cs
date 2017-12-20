@@ -162,23 +162,47 @@ namespace Krofiler
 			}
 		}
 		double currentWorkingSet = 0;
+		CountersRow currentRow;
+		object GetSampleValue(SuperEvent ev)
+		{
+			switch (ev.CounterSamplesEvent_Type) {
+				case LogCounterType.Double:
+					return ev.CounterSamplesEvent_Value_Double;
+				case LogCounterType.UInt32:
+				case LogCounterType.UInt64:
+				case LogCounterType.String:
+					return ev.CounterSamplesEvent_Value_Ulong;
+				case LogCounterType.Word:
+				case LogCounterType.Int32:
+				case LogCounterType.Int64:
+				case LogCounterType.Interval:
+					return ev.CounterSamplesEvent_Value_Long;
+			}
+			throw new NotImplementedException();
+		}
 		private void CounterSamplesAdded(SuperEvent obj)
 		{
-			//Application.Instance.AsyncInvoke(delegate {
-			//	if (Settings.Instance.ShowPerformanceCounters) {
-			//		var row = new CountersRow();
-			//		row.time = obj.Time;
-			//		foreach (var item in obj.Samples) {
-			//			row.Counters[item.Index] = item.Value;
-			//		}
-			//			((ObservableCollection<CountersRow>)countersView.DataStore).Add(row);
-			//	} else if (Settings.Instance.ShowGraphs) {
-			//		var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
-			//		if (workingSetValue != null)
-			//			currentWorkingSet += (double)(long)workingSetValue;
-			//		workingMemory.AddSample(obj.Time, currentWorkingSet);
-			//	}
-			//});
+			Application.Instance.AsyncInvoke(delegate {
+				if (Settings.Instance.ShowPerformanceCounters) {
+					if (currentRow == null) {
+						currentRow = new CountersRow();
+						currentRow.time = obj.Time;
+						currentRow.Counters[obj.CounterSamplesEvent_Index] = GetSampleValue(obj);
+					} else if (currentRow.time == obj.Time) {
+						currentRow.Counters[obj.CounterSamplesEvent_Index] = GetSampleValue(obj);
+					} else {
+						((ObservableCollection<CountersRow>)countersView.DataStore).Add(currentRow);
+						currentRow = new CountersRow();
+						currentRow.time = obj.Time;
+						currentRow.Counters[obj.CounterSamplesEvent_Index] = GetSampleValue(obj);
+					}
+				} else if (Settings.Instance.ShowGraphs) {
+					//var workingSetValue = obj.Samples.FirstOrDefault(s => s.Index == 4).Value;
+					//if (workingSetValue != null)
+					//	currentWorkingSet += (double)(long)workingSetValue;
+					//workingMemory.AddSample(obj.Time, currentWorkingSet);
+				}
+			});
 		}
 
 		class CountersRow
@@ -187,27 +211,27 @@ namespace Krofiler
 			public Dictionary<long, object> Counters = new Dictionary<long, object>();
 		}
 
-		private void CountersDescriptionsAdded()
+		private void CountersDescriptionsAdded(SuperEvent item)
 		{
 			Application.Instance.AsyncInvoke(delegate {
 				if (Settings.Instance.ShowPerformanceCounters) {
-					countersView.Columns.Add(new GridColumn() {
-						Resizable = true,
-						AutoSize = true,
-						Editable = false,
-						HeaderText = "Time sice start",
-						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
-					});
-					foreach (var item in CurrentSession.Descriptions) {
+					if (countersView.Columns.Count == 0)
 						countersView.Columns.Add(new GridColumn() {
 							Resizable = true,
-							AutoSize = false,
+							AutoSize = true,
 							Editable = false,
-							Sortable = true,
-							HeaderText = item.GetCounterName(CurrentSession.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(CurrentSession.processor)}",
-							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index) ? r.Counters[item.CounterDescriptionsEvent_Index].ToString() : "") },
+							HeaderText = "Time sice start",
+							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
 						});
-					}
+
+					countersView.Columns.Add(new GridColumn() {
+						Resizable = true,
+						AutoSize = false,
+						Editable = false,
+						Sortable = true,
+						HeaderText = item.GetCounterName(CurrentSession.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(CurrentSession.processor)}",
+						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index) ? r.Counters[item.CounterDescriptionsEvent_Index].ToString() : "") },
+					});
 				}
 			});
 		}

@@ -8,8 +8,8 @@ namespace Krofiler
 	{
 		public Heapshot OldHeapshot { get; internal set; }
 		public Heapshot NewHeapshot { get; internal set; }
-		public List<ObjectInfo> NewObjects { get; private set; } = new List<ObjectInfo>();
-		public List<ObjectInfo> DeletedObjects { get; private set; } = new List<ObjectInfo>();
+		public List<long> NewObjects { get; private set; } = new List<long>();
+		public List<long> DeletedObjects { get; private set; } = new List<long>();
 
 
 		public DiffHeap(Heapshot oldHs, Heapshot newHs)
@@ -17,12 +17,11 @@ namespace Krofiler
 			OldHeapshot = oldHs;
 			NewHeapshot = newHs;
 
-			var oldAllocs = oldHs.ObjectsInfoMap.ToDictionary(p => p.Value.Allocation, p => p.Value);
-			var newAllocs = newHs.ObjectsInfoMap.ToDictionary(p => p.Value.Allocation, p => p.Value);
+			var newAllocs = newHs.ObjectsInfoMap.ToDictionary(p => p.Value.Allocation, p => p.Value.ObjAddr);
 
-			foreach (var a in oldAllocs) {
-				if (!newAllocs.Remove(a.Key)) {
-					DeletedObjects.Add(a.Value);
+			foreach (var a in oldHs.ObjectsInfoMap.Values) {
+				if (!newAllocs.Remove(a.Allocation)) {
+					DeletedObjects.Add(a.ObjAddr);
 				}
 			}
 			// What is left in list is new

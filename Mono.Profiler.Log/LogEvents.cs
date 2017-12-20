@@ -12,8 +12,13 @@ namespace Mono.Profiler.Log
 	[StructLayout(LayoutKind.Explicit, Size = 40)]
 	public struct SuperEvent
 	{
+		public SuperEvent(ulong timeAndType) : this()
+		{
+			TimestampAndType = timeAndType;
+		}
+
 		[FieldOffset(0)]
-		public ulong Timestamp;
+		public ulong TimestampAndType;
 
 		[FieldOffset(8)]
 		public long AppDomainLoadEvent_AppDomainId;
@@ -121,8 +126,6 @@ namespace Mono.Profiler.Log
 		public long HeapObjectEvent_VTablePointer;
 		[FieldOffset(24)]
 		public long HeapObjectEvent_ObjectSize;
-		[FieldOffset(32)]
-		public ulong HeapObjectEvent_FilePointer;
 
 		[FieldOffset(8)]
 		public long HeapRootsEvent_AddressPointer;
@@ -229,7 +232,11 @@ namespace Mono.Profiler.Log
 		[FieldOffset(16)]
 		public LogCounterType CounterSamplesEvent_Type;
 		[FieldOffset(24)]
-		public object CounterSamplesEvent_Value;
+		public double CounterSamplesEvent_Value_Double;
+		[FieldOffset(24)]
+		public long CounterSamplesEvent_Value_Long;
+		[FieldOffset(24)]
+		public ulong CounterSamplesEvent_Value_Ulong;
 
 		[FieldOffset(8)]
 		public ulong CounterDescriptionsEvent_SectionTypeUnitVariance;
@@ -259,25 +266,27 @@ namespace Mono.Profiler.Log
 		[FieldOffset(8)]
 		public LogSynchronizationPoint SynchronizationPointEvent_Type;
 
-		public TimeSpan Time { get => TimeSpan.FromTicks((long)Timestamp / 100); }
+		public TimeSpan Time { get => TimeSpan.FromTicks((long)(TimestampAndType >> 8) / 100); }
 
 
 		internal string GetName(LogProcessor processor)
 		{
-			//switch(EventType){
-				//default:
-			throw new NotImplementedException();
-			//}
+			switch ((LogEventId)(TimestampAndType & 0xff)) {
+				case LogEventId.HeapRootRegister:
+					return processor.ReadString(HeapRootRegisterEvent_Name);
+				default:
+					throw new NotImplementedException("GetName not implemented for " + (LogEventId)(TimestampAndType & 0xff));
+			}
 		}
 
 		internal object GetSectionName(LogProcessor processor)
 		{
-			throw new NotImplementedException();
+			return processor.ReadString(CounterDescriptionsEvent_SectionName);
 		}
 
 		internal string GetCounterName(LogProcessor processor)
 		{
-			throw new NotImplementedException();
+			return processor.ReadString(CounterDescriptionsEvent_CounterName);
 		}
 	}
 }

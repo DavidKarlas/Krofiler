@@ -23,6 +23,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Logic\Heapshot.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\DiffHeap.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CpuSampling\SampleWrapper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Database.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Logic\" />

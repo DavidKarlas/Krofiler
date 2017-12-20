@@ -37,14 +37,14 @@ namespace Krofiler
 		{
 			public string TypeName;
 			public long TypeId;
-			public List<ObjectInfo> NewObjects;
-			public List<ObjectInfo> DeadObjects;
-			public List<ObjectInfo> NewHsObjects;
-			public List<ObjectInfo> OldHsObjects;
+			public List<long> NewObjects;
+			public List<long> DeadObjects;
+			public List<long> NewHsObjects;
+			public List<long> OldHsObjects;
 		}
 		TextBox filterTypesTextBox;
 
-		static List<ObjectInfo> EmptyList = new List<ObjectInfo>();
+		static List<long> EmptyList = new List<long>();
 
 		public CompareHeapshotsTab(KrofilerSession session, Heapshot hs1, Heapshot hs2)
 		{
@@ -57,8 +57,8 @@ namespace Krofiler
 				oldHeapshot = hs2;
 			}
 			var diff = new DiffHeap(oldHeapshot, newHeapshot);
-			var newObjects = diff.NewObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
-			var deleted = diff.DeletedObjects.GroupBy(addr => addr.TypeId).ToDictionary(d => d.Key, d => d.ToList());
+			var newObjects = diff.NewObjects.GroupBy(addr => newHeapshot.ObjectsInfoMap[addr].TypeId).ToDictionary(d => d.Key, d => d.ToList());
+			var deleted = diff.DeletedObjects.GroupBy(addr => oldHeapshot.ObjectsInfoMap[addr].TypeId).ToDictionary(d => d.Key, d => d.ToList());
 			var allObjectsInOldHs = oldHeapshot.TypesToObjectsListMap;
 			var allObjectsInNewHs = newHeapshot.TypesToObjectsListMap;
 			var hashTableAllTypes = new HashSet<long>();
@@ -136,7 +136,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
 			var deadObjs = new Command() {
 				MenuText = "Select Dead objects"
@@ -146,7 +146,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).DeadObjects } }), this);
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).DeadObjects } }), this);
 			};
 			var newHs = new Command() {
 				MenuText = "Select All in New Heapshot"
@@ -156,7 +156,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
 			};
 			var oldHs = new Command() {
 				MenuText = "Select All in Old Heapshot"
@@ -166,7 +166,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<ObjectInfo>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
 			};
 
 			return new ContextMenu(newObjs, deadObjs, newHs, oldHs);

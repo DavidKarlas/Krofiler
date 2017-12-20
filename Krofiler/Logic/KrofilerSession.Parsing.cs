@@ -9,6 +9,25 @@ using Mono.Profiler.Log;
 
 namespace Krofiler
 {
+
+	public class MoreReferences
+	{
+		public ulong FilePointer;
+		public MoreReferences More;
+	}
+
+	public struct ObjReferences
+	{
+		public ulong FilePointer;
+		public MoreReferences More;
+
+		public ObjReferences(ulong filePointer)
+		{
+			this.FilePointer = filePointer;
+			More = null;
+		}
+	}
+
 	public partial class KrofilerSession
 	{
 		ProfilerRunner runner;
@@ -74,7 +93,7 @@ namespace Krofiler
 			Finished?.Invoke(this);
 		}
 
-		public event Action CountersDescriptionsAdded;
+		public event Action<SuperEvent> CountersDescriptionsAdded;
 		public List<SuperEvent> Descriptions = new List<SuperEvent>();
 		public event Action<SuperEvent> CounterSamplesAdded;
 		//Dictionary<long, List<Action<object>>> callbacks = new Dictionary<long, List<Action<object>>>();
@@ -95,14 +114,7 @@ namespace Krofiler
 			public override void VisitCounterDescriptionsEvent(SuperEvent ev)
 			{
 				session.Descriptions.Add(ev);
-				session.CountersDescriptionsAdded?.Invoke();
-				if (timer == null)
-					timer = new Timer(ProcessingTimer, null, TimeSpan.FromSeconds(0.1), TimeSpan.FromSeconds(0.1));
-			}
-
-			private void ProcessingTimer(object state)
-			{
-				ProcessAllocationsPerSecond();
+				session.CountersDescriptionsAdded?.Invoke(ev);
 			}
 
 			public override void VisitCounterSamplesEvent(SuperEvent ev)
@@ -117,35 +129,16 @@ namespace Krofiler
 			}
 
 			private KrofilerSession session;
-			Dictionary<long, ulong> allocationsTracker = new Dictionary<long, ulong>();
+			Dictionary<long,ulong> allocationsTracker = new Dictionary<long, ulong>();
 
 			public KrofilerLogEventVisitor(KrofilerSession session)
 			{
 				this.session = session;
+				Console.WriteLine($"Start: {DateTime.Now}");
 			}
 
-			int lastReportedSecond = -1;
-			ulong newestSecond = 0;
-			private void ProcessAllocationsPerSecond()
-			{
-				while (lastReportedSecond + 20 < (int)newestSecond) {
-					lastReportedSecond++;
-					session.AllocationsPerSecond?.Invoke(session, TimeSpan.FromMilliseconds(lastReportedSecond * 100), allocatedObjectsPerSecond[lastReportedSecond], allocatedBytesPerSecond[lastReportedSecond]);
-				}
-			}
-
-			//TODO: I'm lazy... lower this to 100 and start from begining of array once end is reached
-			uint[] allocatedObjectsPerSecond = new uint[100000];
-			uint[] allocatedBytesPerSecond = new uint[100000];
 			public override void VisitAllocationEvent(SuperEvent ev)
 			{
-				var sec = ev.Timestamp / 100000000;
-				if (newestSecond < sec)
-					newestSecond = sec;
-				if ((int)sec <= lastReportedSecond)
-					Console.WriteLine("Trouble in paradise!");
-				allocatedObjectsPerSecond[sec]++;
-				allocatedBytesPerSecond[sec] += (uint)ev.AllocationEvent_ObjectSize;
 				allocationsTracker[ev.AllocationEvent_ObjectPointer] = ev.AllocationEvent_FilePointer;
 			}
 
@@ -169,19 +162,17 @@ namespace Krofiler
 
 			int heapshotCounter;
 			Heapshot currentHeapshot;
-			Stopwatch processingHeapTime;
 
 			public override void VisitHeapBeginEvent(SuperEvent ev)
 			{
-				Console.WriteLine("CACA2:" + DateTime.Now);
-				System.Environment.Exit(2);
-				processingHeapTime = Stopwatch.StartNew();
 				currentHeapshot = new Heapshot(session, ++heapshotCounter);
+				Console.WriteLine($"HeapBeginEvent({currentHeapshot.Name}): {DateTime.Now}");
 			}
 
 			public override void VisitHeapEndEvent(SuperEvent ev)
 			{
-				processingHeapTime.Stop();
+				Console.WriteLine($"HeapEndEvent({currentHeapshot.Name}): {DateTime.Now}");
+				Console.WriteLine($"Allocations before cleanup({DateTime.Now}):{allocationsTracker.Count}");
 				var deadAllocations = new HashSet<long>();
 				foreach (var key in allocationsTracker.Keys)
 					if (!currentHeapshot.ObjectsInfoMap.ContainsKey(key))
@@ -189,22 +180,14 @@ namespace Krofiler
 				foreach (var key in deadAllocations) {
 					allocationsTracker.Remove(key);
 				}
-
+				Console.WriteLine($"Allocations after cleanup({DateTime.Now}):{allocationsTracker.Count}");
+				session.Heapshots.Add(currentHeapshot);
 				session.NewHeapshot?.Invoke(session, currentHeapshot);
 				currentHeapshot = null;
 			}
 
 			public override void VisitHeapObjectEvent(SuperEvent ev)
 			{
-				if (ev.HeapObjectEvent_ObjectSize == 0) {
-					//var existingObj = currentHeapshot.ObjectsInfoMap[ev.HeapRootsEvent_ObjectPointer];
-					//Array.Resize(ref existingObj.ReferencesTo, existingObj.ReferencesTo.Length + ev.ReferencesTo.Length);
-					//Array.Copy(ev.ReferencesTo, 0, existingObj.ReferencesTo, existingObj.ReferencesTo.Length - ev.ReferencesTo.Length, ev.ReferencesTo.Length);
-					//Array.Resize(ref existingObj.ReferencesAt, existingObj.ReferencesAt.Length + ev.ReferencesAt.Length);
-					//Array.Copy(ev.ReferencesAt, 0, existingObj.ReferencesAt, existingObj.ReferencesAt.Length - ev.ReferencesAt.Length, ev.ReferencesAt.Length);
-					return;
-				}
-
 				var obj = new ObjectInfo();
 				try {
 					obj.Allocation = allocationsTracker[ev.HeapObjectEvent_ObjectPointer];
@@ -214,12 +197,10 @@ namespace Krofiler
 				}
 				obj.ObjAddr = ev.HeapObjectEvent_ObjectPointer;
 				obj.TypeId = vtableToClass[ev.HeapObjectEvent_VTablePointer];
-				//obj.ReferencesTo = ev.ReferencesTo;
-				//obj.ReferencesAt = ev.ReferencesAt;
-				if (!currentHeapshot.TypesToObjectsListMap.ContainsKey(obj.TypeId))
-					currentHeapshot.TypesToObjectsListMap[obj.TypeId] = new List<ObjectInfo>();
-				currentHeapshot.TypesToObjectsListMap[obj.TypeId].Add(obj);
-
+				if (currentHeapshot.TypesToObjectsListMap.TryGetValue(obj.TypeId, out var list))
+					list.Add(obj.ObjAddr);
+				else
+					currentHeapshot.TypesToObjectsListMap[obj.TypeId] = new List<long>() { obj.ObjAddr };
 				currentHeapshot.ObjectsInfoMap.Add(ev.HeapObjectEvent_ObjectPointer, obj);
 			}
 
@@ -236,27 +217,30 @@ namespace Krofiler
 
 			public override void VisitHeapRootsEvent(SuperEvent ev)
 			{
-				if (currentHeapshot != null) {
-					var index = rootsEventsBinary.BinarySearch(ev.HeapRootsEvent_AddressPointer);
-					if (index < 0) {
-						index = ~index;
-						if (index == 0) {
-							Console.WriteLine($"This should not happen. Root is before any HeapRootsEvent {ev.HeapRootsEvent_AddressPointer}.");
-							return;
-						}
-						var rootReg = rootsEvents[rootsEventsBinary[index - 1]];
-						if (rootReg.HeapRootRegisterEvent_RootPointer < ev.HeapRootsEvent_AddressPointer && rootReg.HeapRootRegisterEvent_RootPointer + rootReg.HeapRootRegisterEvent_RootSize >= ev.HeapRootsEvent_AddressPointer) {
-							currentHeapshot.Roots[ev.HeapRootsEvent_ObjectPointer] = rootReg;
-						} else {
-							Console.WriteLine($"This should not happen. Closest root is too small({ev.HeapRootsEvent_AddressPointer}):");
-							Console.WriteLine(rootReg);
-						}
+				ProcessNewRoot(ev.HeapRootsEvent_ObjectPointer, ev.HeapRootsEvent_AddressPointer);
+				if (ev.HeapRootsEvent_ObjectPointer2 != 0)
+					ProcessNewRoot(ev.HeapRootsEvent_ObjectPointer2, ev.HeapRootsEvent_AddressPointer2);
+			}
+
+			void ProcessNewRoot(long objAddr, long rootAddr)
+			{
+				var index = rootsEventsBinary.BinarySearch(rootAddr);
+				if (index < 0) {
+					index = ~index;
+					if (index == 0) {
+						Console.WriteLine($"This should not happen. Root is before any HeapRootsEvent {rootAddr}.");
+						return;
+					}
+					var rootReg = rootsEvents[rootsEventsBinary[index - 1]];
+					if (rootReg.HeapRootRegisterEvent_RootPointer < rootAddr && rootReg.HeapRootRegisterEvent_RootPointer + rootReg.HeapRootRegisterEvent_RootSize >= rootAddr) {
+						currentHeapshot.Roots[objAddr] = rootReg;
 					} else {
-						//We got exact match
-						currentHeapshot.Roots[ev.HeapRootsEvent_ObjectPointer] = rootsEvents[ev.HeapRootsEvent_AddressPointer];
+						Console.WriteLine($"This should not happen. Closest root is too small({rootAddr}):");
+						Console.WriteLine(rootReg);
 					}
 				} else {
-					//Console.WriteLine("This should not happen. HeapRootsEvent outside HeapshotBegin/End.");
+					//We got exact match
+					currentHeapshot.Roots[objAddr] = rootsEvents[rootAddr];
 				}
 			}
 
@@ -349,7 +333,7 @@ namespace Krofiler
 				if (completionSource?.Task?.IsCompleted ?? false)
 					return 100;
 				try {
-					if ((processor.Stream.Length) == 0)
+					if ((processor?.Stream?.Length ?? 0) == 0)
 						return 0;
 					return (double)processor.Stream.Position / processor.Stream.Length;
 				} catch {
@@ -358,6 +342,16 @@ namespace Krofiler
 			}
 		}
 		List<string> allImagesPaths = new List<string>();
+
+		public FileStream GetFileStream(ulong position)
+		{
+			const ulong fileMask = 0xfful << 56;
+			var fileName = (fileMask & position) + ".krof";
+			var path = Path.Combine(processor.cacheFolder, fileName);
+			var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			stream.Position = (long)(0xfffffffffffffful & position);
+			return stream;
+		}
 	}
 }
 

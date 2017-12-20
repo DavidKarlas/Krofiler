@@ -28,13 +28,12 @@ namespace Mono.Profiler.Log {
 
 		internal long CurrentMethod { get; set; }
 
-		readonly byte* bufferStart;
-		readonly ulong streamPosition;
+		internal byte* bufferStart;
+		internal ulong streamPosition;
 
-		unsafe internal LogBufferHeader (LogStreamHeader streamHeader, LogReader reader, ulong position, byte* bufferStart)
+		unsafe internal LogBufferHeader (LogStreamHeader streamHeader, LogReader reader, ulong position)
 		{
 			this.streamPosition = position;
-			this.bufferStart = bufferStart;
 			StreamHeader = streamHeader;
 
 			var id = reader.ReadInt32 ();

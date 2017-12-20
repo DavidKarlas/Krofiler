@@ -1,28 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Mono.Profiler.Log;
 
 namespace Krofiler
 {
-	public class ObjectInfo
+	public struct ObjectInfo
 	{
 		public long ObjAddr;
 		public long TypeId;
-		public long[] ReferencesTo;
-		public ushort[] ReferencesAt;
-		public List<long> ReferencesFrom = new List<long>();
 		internal ulong Allocation;
 
-		public long[] Backtrace {
-			get {
-				throw new NotImplementedException();
+		public long[] Backtrace(KrofilerSession session)
+		{
+			using (var stream = session.GetFileStream(Allocation)) {
+				var bytes = new byte[8];
+				stream.Position += 8;
+				var depth = (byte)stream.ReadByte();
+				if (depth == 0)
+					return Array.Empty<long>();
+				var buffer = new byte[8];
+				var result = new long[depth];
+				for (int i = 0; i < depth; i++) {
+					stream.Read(buffer, 0, 8);
+					result[i] = BitConverter.ToInt64(buffer, 0);
+				}
+				return result;
 			}
 		}
 
-		public long AllocationTimestamp {
-			get {
-				throw new NotImplementedException();
+		public ulong AllocationTimestamp(KrofilerSession session)
+		{
+			using (var stream = session.GetFileStream(Allocation)) {
+				var bytes = new byte[8];
+				stream.Read(bytes, 0, 8);
+				return BitConverter.ToUInt64(bytes, 0);
 			}
 		}
 	}
