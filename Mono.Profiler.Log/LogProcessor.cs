@@ -109,7 +109,7 @@ namespace Mono.Profiler.Log
 
 			StreamHeader = new LogStreamHeader(_reader);
 			var avaibleWorkers = new Queue<Worker>();
-			ulong workersCount = 1;//(ulong)Environment.ProcessorCount / 2;
+			ulong workersCount = (ulong)Environment.ProcessorCount / 2;
 			for (ulong i = 1; i < workersCount + 1; i++) {
 				avaibleWorkers.Enqueue(new Worker(token, this, cacheFolder, i << 56));
 			}
