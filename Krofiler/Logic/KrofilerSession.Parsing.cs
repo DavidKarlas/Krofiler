@@ -106,11 +106,8 @@ namespace Krofiler
 		//	}
 		//}
 
-		public event Action<KrofilerSession, TimeSpan, double, double> AllocationsPerSecond;
-
 		class KrofilerLogEventVisitor : LogEventVisitor
 		{
-			Timer timer;
 			public override void VisitCounterDescriptionsEvent(SuperEvent ev)
 			{
 				session.Descriptions.Add(ev);
@@ -120,12 +117,6 @@ namespace Krofiler
 			public override void VisitCounterSamplesEvent(SuperEvent ev)
 			{
 				session.CounterSamplesAdded?.Invoke(ev);
-				//foreach (var sample in ev.Samples) {
-				//	if (session.callbacks.TryGetValue(sample.Index, out var callbackList))
-				//		foreach (var callback in callbackList) {
-				//			callback(sample.Value);
-				//		}
-				//}
 			}
 
 			private KrofilerSession session;

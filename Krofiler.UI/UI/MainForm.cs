@@ -32,7 +32,7 @@ namespace Krofiler
 				{
 					new TableRow(new Label { Text = "Max frames" },numericMaxFrames),
 					new TableRow(new Label { Text = "Show Performance Counters" },enableCounters),
-					new TableRow(new Label { Text = "Enable graphs" },enableGraphs),
+					//new TableRow(new Label { Text = "Enable graphs" },enableGraphs),
 					new TableRow(
 						new Button { Text = "Cancel", Command=new Command(delegate {
 							window.Close();

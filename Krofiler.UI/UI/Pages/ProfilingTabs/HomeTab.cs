@@ -146,7 +146,7 @@ namespace Krofiler
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
-			CurrentSession.AllocationsPerSecond += AllocationsPerSecond;
+			//CurrentSession.AllocationsPerSecond += AllocationsPerSecond;
 			CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
 			CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
 			CurrentSession.UserError += UserError;
@@ -316,7 +316,7 @@ namespace Krofiler
 			profMenuItems.Insert(0, killProfilee);
 
 			commandButtonsStack = new StackLayout();
-			commandButtonsStack.Items.Add(cpuSampleButton);
+			//commandButtonsStack.Items.Add(cpuSampleButton);
 			commandButtonsStack.Items.Add(new Button() {
 				Command = takeHeapshot,
 				Text = "Take Heapshot"

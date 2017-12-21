@@ -75,10 +75,10 @@ namespace Krofiler
 					AddSingleEntry("This is weird... Couldn't find path to root");
 
 			referencesList.Items.Clear();
-			//foreach (var r in objectInfo.ReferencesTo) {
-			//	var obj = heapshot.ObjectsInfoMap[r];
-			//	referencesList.Items.Add(new RetentionItem(session.GetTypeName(obj.TypeId) + ": " + r, obj));
-			//}
+			foreach (var r in heapshot.GetReferencedTo(objectInfo.ObjAddr)) {
+				var obj = heapshot.ObjectsInfoMap[r];
+				referencesList.Items.Add(new RetentionItem(session.GetTypeName(obj.TypeId) + ": " + r, obj));
+			}
 		}
 
 		class RetentionItem : IListItem

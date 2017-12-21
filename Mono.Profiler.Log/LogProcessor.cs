@@ -109,7 +109,7 @@ namespace Mono.Profiler.Log
 
 			StreamHeader = new LogStreamHeader(_reader);
 			var avaibleWorkers = new Queue<Worker>();
-			ulong workersCount = (ulong)Environment.ProcessorCount / 2;
+			ulong workersCount = 1;//(ulong)Environment.ProcessorCount / 2;
 			for (ulong i = 1; i < workersCount + 1; i++) {
 				avaibleWorkers.Enqueue(new Worker(token, this, cacheFolder, i << 56));
 			}
@@ -306,7 +306,6 @@ namespace Mono.Profiler.Log
 		{
 			var pos = pointer;
 			while (*pointer++ != 0) { }
-			//Console.WriteLine(Encoding.UTF8.GetString(pos, (int)(pointer - pos - 1)));
 			return _bufferHeader.GetFileOffset(pos);
 		}
 
@@ -320,7 +319,6 @@ namespace Mono.Profiler.Log
 				Value |= ((long)(Byte & 0x7f)) << Shift;
 				Shift += 7;
 			} while (Byte >= 128);
-			// Sign extend negative numbers.
 			if ((Byte & 0x40) > 0)
 				Value |= (-1L) << Shift;
 			return Value;
@@ -369,8 +367,10 @@ namespace Mono.Profiler.Log
 
 		unsafe static ulong ReadBacktrace(bool actuallyRead, ref byte* span, LogBufferHeader _bufferHeader, FileStream fs, ulong fileId, bool managed = true)
 		{
-			if (!actuallyRead)
-				return ulong.MaxValue;
+			if (!actuallyRead) {
+				fs.WriteByte(0);
+				return (ulong)(fs.Position - 1) | fileId;
+			}
 			var posBefore = fs.Position;
 			var length = (byte)ReadULeb128(ref span);
 			fs.WriteByte(length);

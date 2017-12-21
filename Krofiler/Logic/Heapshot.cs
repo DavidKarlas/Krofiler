@@ -29,7 +29,7 @@ namespace Krofiler
 		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
 		public Dictionary<long, SuperEvent> Roots = new Dictionary<long, SuperEvent>();
 		sqlite3 db;
-		sqlite3_stmt stmt;
+		sqlite3_stmt refsFromStmt;
 
 		private static void check_ok(sqlite3 db, int rc)
 		{
@@ -37,40 +37,61 @@ namespace Krofiler
 				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
 		}
 
-		void GenerateStmt()
+		void GenerateRefsFromStmt()
 		{
-			if (stmt != null)
+			if (refsFromStmt != null)
+				return;
+			GenerateDb();
+			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressFrom FROM Refs WHERE AddressTo=?", out refsFromStmt));
+		}
+
+		private void GenerateDb()
+		{
+			if (db != null)
 				return;
 			var rc = raw.sqlite3_open_v2($"file:{Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db")}", out db, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READONLY, null);
 			if (rc != raw.SQLITE_OK)
 				throw new Exception(raw.sqlite3_errstr(rc));
 
-			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressFrom FROM Refs WHERE AddressTo=?", out stmt));
 		}
+
 		Dictionary<long, List<long>> ReferencedFromCache = new Dictionary<long, List<long>>();
 		public List<long> GetReferencedFrom(long objAddr)
 		{
 			if (ReferencedFromCache.TryGetValue(objAddr, out var list))
 				return list;
-			GenerateStmt();
-			check_ok(db, raw.sqlite3_bind_int64(stmt, 1, objAddr));
+			GenerateRefsFromStmt();
+			check_ok(db, raw.sqlite3_bind_int64(refsFromStmt, 1, objAddr));
 			list = new List<long>();
-			while (raw.sqlite3_step(stmt) == raw.SQLITE_ROW) {
-				list.Add(raw.sqlite3_column_int64(stmt, 0));
+			while (raw.sqlite3_step(refsFromStmt) == raw.SQLITE_ROW) {
+				list.Add(raw.sqlite3_column_int64(refsFromStmt, 0));
 			}
-			check_ok(db, raw.sqlite3_reset(stmt));
+			check_ok(db, raw.sqlite3_reset(refsFromStmt));
 			ReferencedFromCache[objAddr] = list;
 			return list;
 		}
 
 		public sqlite3_stmt GetStmt()
 		{
-			return stmt;
+			return refsFromStmt;
 		}
 
 		public sqlite3 GetDb()
 		{
 			return db;
+		}
+
+		public List<long> GetReferencedTo(long objAddr)
+		{
+			GenerateDb();
+			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressTo FROM Refs WHERE AddressFrom=?", out var stmt));
+			check_ok(db, raw.sqlite3_bind_int64(stmt, 1, objAddr));
+			var list = new List<long>();
+			while (raw.sqlite3_step(stmt) == raw.SQLITE_ROW) {
+				list.Add(raw.sqlite3_column_int64(stmt, 0));
+			}
+			check_ok(db, raw.sqlite3_finalize(stmt));
+			return list;
 		}
 
 		public string Name {

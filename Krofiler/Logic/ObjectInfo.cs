@@ -10,7 +10,7 @@ namespace Krofiler
 	{
 		public long ObjAddr;
 		public long TypeId;
-		internal ulong Allocation;
+		public ulong Allocation;
 
 		public long[] Backtrace(KrofilerSession session)
 		{
