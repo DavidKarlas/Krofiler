@@ -43,9 +43,6 @@ Global
 		$1.scope = text/x-csharp
 		$0.CSharpFormattingPolicy = $2
 		$2.scope = text/x-csharp
-		$2.SpacingAfterMethodDeclarationName = False
-		$2.SpaceAfterMethodCallName = False
-		$2.SpaceBeforeOpenSquareBracket = False
 		$2.NewLinesForBracesInProperties = False
 		$2.NewLinesForBracesInAccessors = False
 		$2.NewLinesForBracesInAnonymousMethods = False

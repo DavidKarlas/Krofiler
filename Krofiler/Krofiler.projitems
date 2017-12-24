@@ -24,6 +24,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Logic\DiffHeap.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CpuSampling\SampleWrapper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logic\KrofilerSession.Database.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utils\DbUtils.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logic\LazyObjectsList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utils\PrettyPrint.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Logic\" />

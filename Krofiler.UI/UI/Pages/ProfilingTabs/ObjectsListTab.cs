@@ -13,14 +13,14 @@ namespace Krofiler
 		GridView typesGrid;
 		GridView objectsGrid;
 		TextBox filterTypesTextBox;
-		FilterCollection<Tuple<long, string, int>> typesCollection = new FilterCollection<Tuple<long, string, int>>();
+		FilterCollection<Tuple<long, string, int, long>> typesCollection = new FilterCollection<Tuple<long, string, int, long>>();
 		string typeNameFilter;
 		ObjectDetailsPanel objectPanel;
-		readonly Dictionary<long, List<long>> typesToObjectsListMap;
+		readonly Dictionary<long, LazyObjectsList> typesToObjectsListMap;
 
-		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, List<long>> typesToObjectsListMap)
+		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, LazyObjectsList> typesToObject)
 		{
-			this.typesToObjectsListMap = typesToObjectsListMap;
+			this.typesToObjectsListMap = typesToObject;
 			this.session = session;
 			this.heapshot = heapshot;
 			this.Orientation = Orientation.Horizontal;
@@ -78,20 +78,24 @@ namespace Krofiler
 		void CreateTypesView()
 		{
 			foreach (var type in typesToObjectsListMap) {
-				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), type.Value.Count));
+				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), type.Value.Count, type.Value.Size));
 			}
+			typesCollection.Sort = (x, y) => (y.Item4).CompareTo(x.Item4);
 			typesGrid = new GridView {
 				DataStore = typesCollection
 			};
 			typesGrid.AllowMultipleSelection = false;
 
 			typesGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int>, string>(r => r.Item3.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => r.Item3.ToString()) },
 				HeaderText = "Objects #"
 			});
-
 			typesGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int>, string>(r => r.Item2) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => PrettyPrint.PrintBytes(r.Item4)) },
+				HeaderText = "Size"
+			});
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => r.Item2) },
 				HeaderText = "Type Name"
 			});
 
@@ -100,11 +104,11 @@ namespace Krofiler
 
 		void Grid_SelectedRowsChanged(object sender, EventArgs e)
 		{
-			var selectedItem = typesGrid.SelectedItem as Tuple<long, string, int>;
+			var selectedItem = typesGrid.SelectedItem as Tuple<long, string, int, long>;
 			if (selectedItem == null) {
 				return;
 			}
-			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1].Cast<object>();
+			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1].CreateList().Select(t => heapshot.GetObjectInfo(t));
 			objectsGrid.SelectedRows = Array.Empty<int>();
 			objectsGrid.SelectRow(0);
 		}
@@ -115,26 +119,22 @@ namespace Krofiler
 			objectsGrid.AllowMultipleSelection = false;
 
 			objectsGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<long, string>(r => r.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => r.ObjAddr.ToString()) },
 				HeaderText = "Object Id"
 			});
-			//objectsGrid.Columns.Add(new GridColumn {
-			//	DataCell = new TextBoxCell { Binding = Binding.Delegate<long, string>(r => r.AllocationTimestamp(session).ToString()) },
-			//	HeaderText = "Time"
-			//});
+			objectsGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<ObjectInfo, string>(r => PrettyPrint.PrintBytes(r.Size)) },
+				HeaderText = "Size"
+			});
 
 			objectsGrid.SelectedRowsChanged += ObjectsGrid_SelectedRowsChanged;
 		}
 
 		void ObjectsGrid_SelectedRowsChanged(object sender, EventArgs e)
 		{
-			if (objectsGrid.SelectedItem is long objAddr) {
-				if (!heapshot.ObjectsInfoMap.TryGetValue(objAddr, out var selectedItem)) {
-					return;
-				}
-				objectPanel.Object = selectedItem;
+			if (objectsGrid.SelectedItem is ObjectInfo obj) {
+				objectPanel.Object = obj;
 			}
 		}
 	}
 }
-

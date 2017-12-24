@@ -37,14 +37,14 @@ namespace Krofiler
 		{
 			public string TypeName;
 			public long TypeId;
-			public List<long> NewObjects;
-			public List<long> DeadObjects;
-			public List<long> NewHsObjects;
-			public List<long> OldHsObjects;
+			public LazyObjectsList NewObjects;
+			public LazyObjectsList DeadObjects;
+			public LazyObjectsList NewHsObjects;
+			public LazyObjectsList OldHsObjects;
 		}
 		TextBox filterTypesTextBox;
 
-		static List<long> EmptyList = new List<long>();
+		static EmptyObjectsList EmptyList = EmptyObjectsList.Instance;
 
 		public CompareHeapshotsTab(KrofilerSession session, Heapshot hs1, Heapshot hs2)
 		{
@@ -57,8 +57,8 @@ namespace Krofiler
 				oldHeapshot = hs2;
 			}
 			var diff = new DiffHeap(oldHeapshot, newHeapshot);
-			var newObjects = diff.NewObjects.GroupBy(addr => newHeapshot.ObjectsInfoMap[addr].TypeId).ToDictionary(d => d.Key, d => d.ToList());
-			var deleted = diff.DeletedObjects.GroupBy(addr => oldHeapshot.ObjectsInfoMap[addr].TypeId).ToDictionary(d => d.Key, d => d.ToList());
+			var newObjects = diff.NewObjects;
+			var deleted = diff.DeletedObjects;
 			var allObjectsInOldHs = oldHeapshot.TypesToObjectsListMap;
 			var allObjectsInNewHs = newHeapshot.TypesToObjectsListMap;
 			var hashTableAllTypes = new HashSet<long>();
@@ -92,7 +92,7 @@ namespace Krofiler
 			if (string.IsNullOrWhiteSpace(typeNameFilter))
 				typesCollection.Filter = null;
 			else
-				typesCollection.Filter = (i) => i.TypeName.IndexOf (typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
+				typesCollection.Filter = (i) => i.TypeName.IndexOf(typeNameFilter, StringComparison.OrdinalIgnoreCase) != -1;
 		}
 
 		GridView typesGrid;
@@ -102,10 +102,14 @@ namespace Krofiler
 				DataStore = typesCollection
 			};
 			typesGrid.AllowMultipleSelection = false;
-			typesCollection.Sort = (x, y) => (y.NewObjects.Count - y.DeadObjects.Count).CompareTo(x.NewObjects.Count - x.DeadObjects.Count);
+			typesCollection.Sort = (x, y) => (y.NewObjects.Size - y.DeadObjects.Size).CompareTo(x.NewObjects.Size - x.DeadObjects.Size);
 			typesGrid.Columns.Add(new GridColumn {
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => (r.NewObjects.Count - r.DeadObjects.Count).ToString()) },
 				HeaderText = "Diff"
+			});
+			typesGrid.Columns.Add(new GridColumn {
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => PrettyPrint.PrintBytes(r.NewObjects.Size - r.DeadObjects.Size)) },
+				HeaderText = "Diff Size"
 			});
 			typesGrid.Columns.Add(new GridColumn {
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<TypeChangeInfo, string>(r => r.NewHsObjects.Count.ToString()) },
@@ -136,7 +140,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, LazyObjectsList>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewObjects } }), this);
 			};
 			var deadObjs = new Command() {
 				MenuText = "Select Dead objects"
@@ -146,7 +150,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).DeadObjects } }), this);
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, LazyObjectsList>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).DeadObjects } }), this);
 			};
 			var newHs = new Command() {
 				MenuText = "Select All in New Heapshot"
@@ -156,7 +160,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
+				InsertTab(new ObjectListTab(session, newHeapshot, new Dictionary<long, LazyObjectsList>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).NewHsObjects } }), this);
 			};
 			var oldHs = new Command() {
 				MenuText = "Select All in Old Heapshot"
@@ -166,7 +170,7 @@ namespace Krofiler
 					MessageBox.Show("Select item in list before right-clicking(I know, I know)...");
 					return;
 				}
-				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, List<long>>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
+				InsertTab(new ObjectListTab(session, oldHeapshot, new Dictionary<long, LazyObjectsList>() { { ((TypeChangeInfo)typesGrid.SelectedItem).TypeId, ((TypeChangeInfo)typesGrid.SelectedItem).OldHsObjects } }), this);
 			};
 
 			return new ContextMenu(newObjs, deadObjs, newHs, oldHs);

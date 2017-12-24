@@ -5,31 +5,94 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Mono.Profiler.Log;
-using QuickGraph;
-using QuickGraph.Algorithms.Observers;
-using QuickGraph.Algorithms.Search;
 using SQLitePCL;
 
 namespace Krofiler
 {
-	public class ReferenceEdge : IEdge<long>
+	public class Heapshot
 	{
-		public long Source { get; set; }
-		public long Target { get; set; }
-		public ReferenceEdge(long s, long t)
+		public Heapshot(KrofilerSession session, int id)
 		{
-			Source = s;
-			Target = t;
+			Id = id;
+			Session = session;
+			var file = Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db");
+			var rc = raw.sqlite3_open_v2($"file:{file}", out objsDb, raw.SQLITE_OPEN_CREATE | raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE, null);
+			if (rc != raw.SQLITE_OK)
+				throw new Exception(raw.sqlite3_errstr(rc));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA synchronous=OFF"));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA count_changes=OFF"));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA journal_mode=OFF"));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA temp_store=MEMORY"));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, @"CREATE TABLE Objs
+			(
+				Address INT NOT NULL,
+				TypeId INT NOT NULL,
+				Allocation INT NOT NULL,
+				Size INT NOT NULL
+			)"));
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "BEGIN TRANSACTION;"));
+			check_ok(objsDb, raw.sqlite3_prepare_v2(objsDb, "INSERT INTO Objs(Address, TypeId, Allocation, Size) VALUES(?,?,?,?)", out objsInsertStmt));
+			check_ok(objsDb, raw.sqlite3_prepare_v2(objsDb, "SELECT Allocation, TypeId, Size FROM Objs WHERE Address=?", out objSelectObjInfo));
 		}
-	}
 
-	public class Heapshot : IVertexListGraph<long, ReferenceEdge>
-	{
-		public Dictionary<long, List<long>> TypesToObjectsListMap = new Dictionary<long, List<long>>();
-		public Dictionary<long, ObjectInfo> ObjectsInfoMap = new Dictionary<long, ObjectInfo>();
+		internal void Insert(long addr, long typeId, ulong alloc, long size)
+		{
+			check_ok(objsDb, raw.sqlite3_bind_int64(objsInsertStmt, 1, addr));
+			check_ok(objsDb, raw.sqlite3_bind_int64(objsInsertStmt, 2, typeId));
+			check_ok(objsDb, raw.sqlite3_bind_int64(objsInsertStmt, 3, (long)alloc));
+			check_ok(objsDb, raw.sqlite3_bind_int64(objsInsertStmt, 4, size));
+			var result = raw.sqlite3_step(objsInsertStmt);
+			if (raw.SQLITE_DONE != result)
+				check_ok(objsDb, result);
+			check_ok(objsDb, raw.sqlite3_reset(objsInsertStmt));
+		}
+
+		Task indexingObjs;
+		Task indexingRefs;
+
+		internal void FinishProcessing()
+		{
+			check_ok(objsDb, raw.sqlite3_exec(objsDb, "COMMIT TRANSACTION;"));
+			var rc = raw.sqlite3_open_v2($"file:{Path.Combine(Session.processor.cacheFolder, $"HeapshotRefs_{Id}.db")}", out refsDb, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE, null);
+			if (rc != raw.SQLITE_OK)
+				throw new Exception(raw.sqlite3_errstr(rc));
+			//raw.sqlite3_progress_handler(refsDb,)
+			indexingObjs = Task.Run(() => {
+				check_ok(objsDb, raw.sqlite3_exec(objsDb, @"CREATE INDEX ObjsAddress ON Objs (Address)"));
+			});
+			indexingRefs = Task.Run(() => {
+				check_ok(refsDb, raw.sqlite3_exec(refsDb, @"CREATE INDEX RefsAddressTo ON Refs (AddressTo);"));
+			});
+			check_ok(refsDb, raw.sqlite3_prepare_v2(refsDb, "SELECT AddressFrom FROM Refs WHERE AddressTo=?", out refsFromStmt));
+		}
+
+		public ObjectInfo GetObjectInfo(long objAdr)
+		{
+			indexingObjs.Wait();
+			check_ok(objsDb, raw.sqlite3_bind_int64(objSelectObjInfo, 1, objAdr));
+			var rc = raw.sqlite3_step(objSelectObjInfo);
+			if (rc != raw.SQLITE_ROW) {
+				if (rc == raw.SQLITE_DONE) {
+					throw new KeyNotFoundException();
+				} else {
+					check_ok(objsDb, rc);
+				}
+			}
+			var typeId = raw.sqlite3_column_int64(objSelectObjInfo, 1);
+			var objInfo = new ObjectInfo(objAdr,
+										 raw.sqlite3_column_int64(objSelectObjInfo, 0),
+										 typeId,
+										 raw.sqlite3_column_int64(objSelectObjInfo, 2));
+			check_ok(objsDb, raw.sqlite3_reset(objSelectObjInfo));
+			return objInfo;
+		}
+
 		public Dictionary<long, SuperEvent> Roots = new Dictionary<long, SuperEvent>();
-		sqlite3 db;
+		sqlite3 objsDb;
+		sqlite3 refsDb;
 		sqlite3_stmt refsFromStmt;
+		sqlite3_stmt objsInsertStmt;
+		sqlite3_stmt objSelectObjInfo;
 
 		private static void check_ok(sqlite3 db, int rc)
 		{
@@ -37,60 +100,39 @@ namespace Krofiler
 				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
 		}
 
-		void GenerateRefsFromStmt()
+		Dictionary<long, long[]> refsFromCache = new Dictionary<long, long[]>();
+		public long[] GetReferencedFrom(long objAddr)
 		{
-			if (refsFromStmt != null)
-				return;
-			GenerateDb();
-			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressFrom FROM Refs WHERE AddressTo=?", out refsFromStmt));
-		}
-
-		private void GenerateDb()
-		{
-			if (db != null)
-				return;
-			var rc = raw.sqlite3_open_v2($"file:{Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db")}", out db, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READONLY, null);
-			if (rc != raw.SQLITE_OK)
-				throw new Exception(raw.sqlite3_errstr(rc));
-
-		}
-
-		Dictionary<long, List<long>> ReferencedFromCache = new Dictionary<long, List<long>>();
-		public List<long> GetReferencedFrom(long objAddr)
-		{
-			if (ReferencedFromCache.TryGetValue(objAddr, out var list))
-				return list;
-			GenerateRefsFromStmt();
-			check_ok(db, raw.sqlite3_bind_int64(refsFromStmt, 1, objAddr));
-			list = new List<long>();
+			if (refsFromCache.TryGetValue(objAddr, out var result))
+				return result;
+			indexingRefs.Wait();
+			check_ok(refsDb, raw.sqlite3_bind_int64(refsFromStmt, 1, objAddr));
+			var list = new List<long>();
 			while (raw.sqlite3_step(refsFromStmt) == raw.SQLITE_ROW) {
 				list.Add(raw.sqlite3_column_int64(refsFromStmt, 0));
 			}
-			check_ok(db, raw.sqlite3_reset(refsFromStmt));
-			ReferencedFromCache[objAddr] = list;
-			return list;
+			check_ok(refsDb, raw.sqlite3_reset(refsFromStmt));
+			result = list.ToArray();
+			refsFromCache[objAddr] = result;
+			return result;
 		}
 
-		public sqlite3_stmt GetStmt()
+		public sqlite3 GetObjDb()
 		{
-			return refsFromStmt;
-		}
-
-		public sqlite3 GetDb()
-		{
-			return db;
+			indexingObjs.Wait();
+			return objsDb;
 		}
 
 		public List<long> GetReferencedTo(long objAddr)
 		{
-			GenerateDb();
-			check_ok(db, raw.sqlite3_prepare_v2(db, "SELECT AddressTo FROM Refs WHERE AddressFrom=?", out var stmt));
-			check_ok(db, raw.sqlite3_bind_int64(stmt, 1, objAddr));
+			indexingRefs.Wait();
+			check_ok(refsDb, raw.sqlite3_prepare_v2(refsDb, "SELECT AddressTo FROM Refs WHERE AddressFrom=?", out var stmt));
+			check_ok(refsDb, raw.sqlite3_bind_int64(stmt, 1, objAddr));
 			var list = new List<long>();
 			while (raw.sqlite3_step(stmt) == raw.SQLITE_ROW) {
 				list.Add(raw.sqlite3_column_int64(stmt, 0));
 			}
-			check_ok(db, raw.sqlite3_finalize(stmt));
+			check_ok(refsDb, raw.sqlite3_finalize(stmt));
 			return list;
 		}
 
@@ -103,133 +145,100 @@ namespace Krofiler
 		public KrofilerSession Session { get; }
 		public int Id { get; }
 
-		public Heapshot(KrofilerSession session, int id)
+		List<long[]> cachedResult;
+		long cachedAddr;
+
+		public List<long[]> SearchRoot(long objAddr, int count)
 		{
-			Id = id;
-			Session = session;
+			var queue = new Queue<long[]>();
+			var visited = new HashSet<long>();
+			visited.Add(objAddr);
+			var result = new List<long[]>(count);
+			queue.Enqueue(new long[] { objAddr });
+			while (queue.Any()) {
+				var cur = queue.Dequeue();
+				var node = cur[cur.Length - 1];
+				if (Roots.ContainsKey(node)) {
+					result.Add(cur);
+					if (--count == 0)
+						return result;
+				}
+				foreach (var child in GetReferencedFrom(node)) {
+					if (visited.Add(child)) {
+						var newPath = new long[cur.Length + 1];
+						Array.Copy(cur, 0, newPath, 0, cur.Length);
+						newPath[cur.Length] = child;
+						queue.Enqueue(newPath);
+					}
+				}
+			}
+			return result;
 		}
 
-		List<IEnumerable<ReferenceEdge>> cachedResult;
-		long cachedAddr;
-		public List<IEnumerable<ReferenceEdge>> GetTop5PathsToRoots (long addr)
+		public List<long[]> GetTop5PathsToRoots(long addr)
 		{
 			if (cachedAddr == addr && cachedResult != null)
 				return cachedResult;
-			cachedResult = new List<IEnumerable<ReferenceEdge>> ();
+			cachedResult = new List<long[]>();
 			cachedAddr = addr;
-			if (Roots.ContainsKey (addr))
-			{
+			if (Roots.ContainsKey(addr)) {
 				return cachedResult;
 			}
-			var result = new List<List<ReferenceEdge>> ();
-			var bfsa = new BreadthFirstSearchAlgorithm<long, ReferenceEdge> (this);
-			var vis = new VertexPredecessorRecorderObserver<long, ReferenceEdge> ();
-			vis.Attach (bfsa);
-			var visitedRoots = new HashSet<long> ();
-			bfsa.ExamineVertex += (vertex) =>
-			{
-				if (Roots.ContainsKey (vertex))
-				{
-					visitedRoots.Add (vertex);
-					if (visitedRoots.Count == 5)
-					{
-						bfsa.Services.CancelManager.Cancel ();
-					}
-				}
-			};
-			bfsa.Compute (addr);
-			foreach (var root in visitedRoots)
-			{
-				if (vis.TryGetPath (root, out var path))
-				{
-					cachedResult.Add (path);
-				}
-			}
+			cachedResult = SearchRoot(addr, 5);
 			return cachedResult;
 		}
 
-		#region QuickGraph interface
-		public bool AllowParallelEdges {
+		class HsTypesList : LazyObjectsList
+		{
+			private sqlite3 db;
+			private long typeId;
+
+			public HsTypesList(sqlite3 db, int count, long size, long typeId)
+				: base(count, size)
+			{
+				this.db = db;
+				this.typeId = typeId;
+			}
+
+			public override IEnumerable<ObjectInfo> CreateList(string orderByColum = "Size", bool descending = true, int limit = 100)
+			{
+				var result = new List<ObjectInfo>(limit);
+				sqlite3_stmt query;
+				if (string.IsNullOrEmpty(orderByColum))
+					DbUtils.check_ok(db, raw.sqlite3_prepare_v2(db, $"SELECT Address, Allocation, Size FROM Objs WHERE TypeId=? LIMIT {limit}", out query));
+				else
+					DbUtils.check_ok(db, raw.sqlite3_prepare_v2(db, $"SELECT Address, Allocation, Size FROM Objs WHERE TypeId=? ORDER BY {orderByColum} {(descending ? "DESC" : "ASC")} LIMIT {limit}", out query));
+				DbUtils.check_ok(db, raw.sqlite3_bind_int64(query, 1, typeId));
+				int res;
+				while ((res = raw.sqlite3_step(query)) == raw.SQLITE_ROW) {
+					yield return new ObjectInfo(raw.sqlite3_column_int64(query, 0),
+											  raw.sqlite3_column_int64(query, 1),
+											  typeId,
+											  raw.sqlite3_column_int64(query, 2)
+											   );
+				}
+				if (res != raw.SQLITE_DONE)
+					DbUtils.check_ok(db, res);
+				DbUtils.check_ok(db, raw.sqlite3_finalize(query));
+			}
+		}
+		Dictionary<long, LazyObjectsList> cachedTypesToObjectsListMap;
+		public Dictionary<long, LazyObjectsList> TypesToObjectsListMap {
 			get {
-				return false;
+				if (cachedTypesToObjectsListMap != null)
+					return cachedTypesToObjectsListMap;
+				cachedTypesToObjectsListMap = new Dictionary<long, LazyObjectsList>();
+				DbUtils.check_ok(objsDb, raw.sqlite3_prepare_v2(objsDb, "SELECT TypeId, Count(Address), Sum(Size) FROM Objs GROUP BY TypeId", out var stmt));
+				int res;
+				while ((res = raw.sqlite3_step(stmt)) == raw.SQLITE_ROW) {
+					long typeId = raw.sqlite3_column_int64(stmt, 0);
+					cachedTypesToObjectsListMap.Add(typeId, new HsTypesList(objsDb, raw.sqlite3_column_int(stmt, 1), raw.sqlite3_column_int64(stmt, 2), typeId));
+				}
+				if (res != raw.SQLITE_DONE)
+					DbUtils.check_ok(objsDb, res);
+				DbUtils.check_ok(objsDb, raw.sqlite3_finalize(stmt));
+				return cachedTypesToObjectsListMap;
 			}
 		}
-
-		public bool IsDirected {
-			get {
-				return true;
-			}
-		}
-
-		public bool IsVerticesEmpty {
-			get {
-				return ObjectsInfoMap.Count == 0;
-			}
-		}
-
-		public int VertexCount {
-			get {
-				return ObjectsInfoMap.Count;
-			}
-		}
-
-		public IEnumerable<long> Vertices {
-			get {
-				return ObjectsInfoMap.Keys;
-			}
-		}
-
-		public bool ContainsEdge(long source, long target)
-		{
-			return GetReferencedFrom(source).Contains(target);
-		}
-
-		public bool ContainsVertex(long vertex)
-		{
-			return ObjectsInfoMap.ContainsKey(vertex);
-		}
-
-		public bool IsOutEdgesEmpty(long v)
-		{
-			return GetReferencedFrom(v).Count == 0;
-		}
-
-		public int OutDegree(long v)
-		{
-			return GetReferencedFrom(v).Count;
-		}
-
-		public ReferenceEdge OutEdge(long v, int index)
-		{
-			return new ReferenceEdge(v, GetReferencedFrom(v)[index]);
-		}
-
-		public IEnumerable<ReferenceEdge> OutEdges(long v)
-		{
-			foreach (var r in GetReferencedFrom(v)) {
-				yield return new ReferenceEdge(v, r);
-			}
-		}
-
-		public bool TryGetEdge(long source, long target, out ReferenceEdge edge)
-		{
-			if (GetReferencedFrom(source).Contains(target)) {
-				edge = default(ReferenceEdge);
-				return false;
-			}
-			edge = new ReferenceEdge(source, target);
-			return true;
-		}
-
-		public bool TryGetEdges(long source, long target, out IEnumerable<ReferenceEdge> edges)
-		{
-			throw new Exception("This graph doesn't allow Parallel Edges");
-		}
-
-		public bool TryGetOutEdges(long v, out IEnumerable<ReferenceEdge> edges)
-		{
-			throw new NotImplementedException();
-		}
-		#endregion
 	}
 }

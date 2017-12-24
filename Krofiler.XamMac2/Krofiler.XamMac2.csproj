@@ -74,33 +74,12 @@
       <HintPath>..\packages\Mono.Cecil.0.9.6.1\lib\net45\Mono.Cecil.Rocks.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml" />
-    <Reference Include="QuickGraph.Data">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Data.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph.Graphviz">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Graphviz.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph.Serialization">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Serialization.dll</HintPath>
-    </Reference>
+    <Reference Include="Mono.Posix" />
     <Reference Include="Eto">
       <HintPath>..\packages\Eto.Forms.2.1.0\lib\net45\Eto.dll</HintPath>
     </Reference>
     <Reference Include="Eto.XamMac2">
       <HintPath>..\packages\Eto.Platform.XamMac2.2.1.0\lib\net45\Eto.XamMac2.dll</HintPath>
-    </Reference>
-    <Reference Include="System.ValueTuple">
-      <HintPath>..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
-    </Reference>
-    <Reference Include="Mono.Posix" />
-    <Reference Include="SQLitePCLRaw.core">
-      <HintPath>..\packages\SQLitePCLRaw.core.1.1.9\lib\net45\SQLitePCLRaw.core.dll</HintPath>
-    </Reference>
-    <Reference Include="SQLitePCLRaw.provider.e_sqlite3">
-      <HintPath>..\packages\SQLitePCLRaw.provider.e_sqlite3.net45.1.1.9\lib\net45\SQLitePCLRaw.provider.e_sqlite3.dll</HintPath>
     </Reference>
     <Reference Include="SQLitePCLRaw.batteries_green">
       <HintPath>..\packages\SQLitePCLRaw.bundle_green.1.1.9\lib\net45\SQLitePCLRaw.batteries_green.dll</HintPath>
@@ -108,6 +87,13 @@
     <Reference Include="SQLitePCLRaw.batteries_v2">
       <HintPath>..\packages\SQLitePCLRaw.bundle_green.1.1.9\lib\net45\SQLitePCLRaw.batteries_v2.dll</HintPath>
     </Reference>
+    <Reference Include="SQLitePCLRaw.core">
+      <HintPath>..\packages\SQLitePCLRaw.core.1.1.9\lib\net45\SQLitePCLRaw.core.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.provider.e_sqlite3">
+      <HintPath>..\packages\SQLitePCLRaw.provider.e_sqlite3.net45.1.1.9\lib\net45\SQLitePCLRaw.provider.e_sqlite3.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />

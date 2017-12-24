@@ -17,7 +17,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\HomeTab.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectDetailsPanel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\ObjectsListTab.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\RetentionGraph.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Controls\GraphView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Pages\ProfilingTabs\CpuSamplingTab.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Controls\CpuSampleView.cs" />

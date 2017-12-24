@@ -20,7 +20,7 @@ namespace Krofiler
 				return objectInfo;
 			}
 			set {
-				if (objectInfo.ObjAddr == value.ObjAddr)
+				if (objectInfo?.ObjAddr == value.ObjAddr)
 					return;
 				objectInfo = value;
 				OnObjectIdChanged();
@@ -50,9 +50,7 @@ namespace Krofiler
 				var listBox = new ListBox();
 				listBox.MouseDoubleClick += (s, e) => {
 					if (listBox.SelectedValue is RetentionItem ri) {
-						var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<long>>() {
-							[ri.obj.TypeId] = new List<long>() { ri.obj.ObjAddr }
-						});
+						var newTab = new ObjectListTab(session, heapshot, CreateObjectList(ri.obj));
 						newTab.InsertTab += InsertTab;
 						InsertTab(newTab, null);
 					}
@@ -60,13 +58,13 @@ namespace Krofiler
 				var page = new TabPage(listBox) {
 					Text = $"Path {i}"
 				};
-				retentionPaths.Pages.Add(page);
 				foreach (var edge in path) {
-					var objInfo = heapshot.ObjectsInfoMap[edge.Target];
+					var objInfo = heapshot.GetObjectInfo(edge);
 					var typeName = session.GetTypeName(objInfo.TypeId);
 					listBox.Items.Add(new RetentionItem(typeName, objInfo));//TODO: Add field to name
 				}
-				listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last().Target].GetName(session.processor), heapshot.ObjectsInfoMap[path.Last().Target]));
+				listBox.Items.Add(new RetentionItem("Root:" + heapshot.Roots[path.Last()].GetName(session.processor), heapshot.GetObjectInfo(path.Last())));
+				retentionPaths.Pages.Add(page);
 			}
 			if (!pathsToRoot.Any())
 				if (heapshot.Roots.TryGetValue(objectInfo.ObjAddr, out var root))
@@ -76,9 +74,16 @@ namespace Krofiler
 
 			referencesList.Items.Clear();
 			foreach (var r in heapshot.GetReferencedTo(objectInfo.ObjAddr)) {
-				var obj = heapshot.ObjectsInfoMap[r];
+				var obj = heapshot.GetObjectInfo(r);
 				referencesList.Items.Add(new RetentionItem(session.GetTypeName(obj.TypeId) + ": " + r, obj));
 			}
+		}
+
+		private static Dictionary<long, LazyObjectsList> CreateObjectList(ObjectInfo obj)
+		{
+			return new Dictionary<long, LazyObjectsList>() {
+				[obj.TypeId] =new SingleLazyObjectList(obj)
+			};
 		}
 
 		class RetentionItem : IListItem
@@ -115,8 +120,8 @@ namespace Krofiler
 			});
 			referencesList.MouseDoubleClick += (s, e) => {
 				if (referencesList.SelectedValue is RetentionItem ri) {
-					var newTab = new ObjectListTab(session, heapshot, new Dictionary<long, List<long>>() {
-						[ri.obj.TypeId] = new List<long>() { ri.obj.ObjAddr }
+					var newTab = new ObjectListTab(session, heapshot, new Dictionary<long,LazyObjectsList>() {
+						[ri.obj.TypeId] = new SingleLazyObjectList(ri.obj.ObjAddr,ri.obj.Size )
 					});
 					newTab.InsertTab += InsertTab;
 					InsertTab(newTab, null);

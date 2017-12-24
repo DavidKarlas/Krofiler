@@ -6,11 +6,20 @@ using Mono.Profiler.Log;
 
 namespace Krofiler
 {
-	public struct ObjectInfo
+	public class ObjectInfo
 	{
-		public long ObjAddr;
+		private ulong Allocation;
 		public long TypeId;
-		public ulong Allocation;
+		public long Size;
+		public long ObjAddr;
+
+		public ObjectInfo(long objAddr, long alloc, long typeId, long size)
+		{
+			this.ObjAddr = objAddr;
+			this.Allocation = (ulong)alloc;
+			this.TypeId = typeId;
+			this.Size = size;
+		}
 
 		public long[] Backtrace(KrofilerSession session)
 		{

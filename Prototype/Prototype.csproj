@@ -19,6 +19,7 @@
     <WarningLevel>4</WarningLevel>
     <ExternalConsole>true</ExternalConsole>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <Optimize>true</Optimize>
@@ -28,21 +29,10 @@
     <ExternalConsole>true</ExternalConsole>
     <Commandlineparameters></Commandlineparameters>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="QuickGraph.Data">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Data.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph.Graphviz">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Graphviz.dll</HintPath>
-    </Reference>
-    <Reference Include="QuickGraph.Serialization">
-      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\QuickGraph.Serialization.dll</HintPath>
-    </Reference>
     <Reference Include="System.Xml" />
     <Reference Include="System.ValueTuple">
       <HintPath>..\packages\System.ValueTuple.4.4.0\lib\net461\System.ValueTuple.dll</HintPath>

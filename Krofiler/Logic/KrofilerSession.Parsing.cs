@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Mono.Profiler.Log;
+using SQLitePCL;
 
 namespace Krofiler
 {
@@ -120,7 +121,7 @@ namespace Krofiler
 			}
 
 			private KrofilerSession session;
-			Dictionary<long,ulong> allocationsTracker = new Dictionary<long, ulong>();
+			Dictionary<long, ulong> allocationsTracker = new Dictionary<long, ulong>(24000000);
 
 			public KrofilerLogEventVisitor(KrofilerSession session)
 			{
@@ -157,42 +158,36 @@ namespace Krofiler
 			public override void VisitHeapBeginEvent(SuperEvent ev)
 			{
 				currentHeapshot = new Heapshot(session, ++heapshotCounter);
+				deadObjs = new HashSet<long>(allocationsTracker.Keys);
 				Console.WriteLine($"HeapBeginEvent({currentHeapshot.Name}): {DateTime.Now}");
 			}
 
+			HashSet<long> deadObjs;
 			public override void VisitHeapEndEvent(SuperEvent ev)
 			{
 				Console.WriteLine($"HeapEndEvent({currentHeapshot.Name}): {DateTime.Now}");
+				currentHeapshot.FinishProcessing();
 				Console.WriteLine($"Allocations before cleanup({DateTime.Now}):{allocationsTracker.Count}");
-				var deadAllocations = new HashSet<long>();
-				foreach (var key in allocationsTracker.Keys)
-					if (!currentHeapshot.ObjectsInfoMap.ContainsKey(key))
-						deadAllocations.Add(key);
-				foreach (var key in deadAllocations) {
+				foreach (var key in deadObjs) {
 					allocationsTracker.Remove(key);
 				}
+				deadObjs = null;
 				Console.WriteLine($"Allocations after cleanup({DateTime.Now}):{allocationsTracker.Count}");
 				session.Heapshots.Add(currentHeapshot);
 				session.NewHeapshot?.Invoke(session, currentHeapshot);
 				currentHeapshot = null;
+				GC.Collect();
 			}
 
 			public override void VisitHeapObjectEvent(SuperEvent ev)
 			{
-				var obj = new ObjectInfo();
+				ulong alloc = 0;
 				try {
-					obj.Allocation = allocationsTracker[ev.HeapObjectEvent_ObjectPointer];
+					deadObjs.Remove(ev.HeapObjectEvent_ObjectPointer);
+					alloc = allocationsTracker[ev.HeapObjectEvent_ObjectPointer];
 				} catch {
-					obj.Allocation = 0;
-					Console.WriteLine("OMG:" + session.classIdToName[vtableToClass[ev.HeapObjectEvent_VTablePointer]]);
 				}
-				obj.ObjAddr = ev.HeapObjectEvent_ObjectPointer;
-				obj.TypeId = vtableToClass[ev.HeapObjectEvent_VTablePointer];
-				if (currentHeapshot.TypesToObjectsListMap.TryGetValue(obj.TypeId, out var list))
-					list.Add(obj.ObjAddr);
-				else
-					currentHeapshot.TypesToObjectsListMap[obj.TypeId] = new List<long>() { obj.ObjAddr };
-				currentHeapshot.ObjectsInfoMap.Add(ev.HeapObjectEvent_ObjectPointer, obj);
+				currentHeapshot.Insert(ev.HeapObjectEvent_ObjectPointer,vtableToClass[ev.HeapObjectEvent_VTablePointer], alloc, ev.HeapObjectEvent_ObjectSize);
 			}
 
 			Dictionary<long, long> vtableToClass = new Dictionary<long, long>();

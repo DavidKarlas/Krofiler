@@ -167,7 +167,7 @@ namespace Mono.Profiler.Log
 						unreportedEvents.Add(workingWorker.BufferId, workingWorker.list);
 						while (unreportedEvents.TryGetValue(lastReportedId, out var list)) {
 							if (list.HasHeapBegin) {
-								var dbFileName = Path.Combine(cacheFolder, $"Heapshot_{++heapshotCounter}.db");
+								var dbFileName = Path.Combine(cacheFolder, $"HeapshotRefs_{++heapshotCounter}.db");
 								if (File.Exists(dbFileName))
 									File.Delete(dbFileName);
 								CreateDatabase($"file:{dbFileName}", false, out db, out var stmt);
@@ -203,11 +203,7 @@ namespace Mono.Profiler.Log
 							}
 							if (list.HasHeapEnd) {
 								MergeDatabase();
-								Task.Factory.StartNew((param) => {
-									var ldb = (sqlite3)param;
-									check_ok(ldb, raw.sqlite3_exec(ldb, @"CREATE INDEX RefsAddressTo ON Refs (AddressTo);"));
-									check_ok(ldb, raw.sqlite3_close(ldb));
-								}, db);
+								check_ok(db, raw.sqlite3_close(db));
 							}
 
 							queue.Enqueue(list);
@@ -217,7 +213,7 @@ namespace Mono.Profiler.Log
 						avaibleWorkers.Enqueue(workingWorker);
 					}
 				}
-				if(!anyComplete){
+				if (!anyComplete) {
 					Task.WaitAny(workingWorkers.Select(w => w.done.Task).ToArray());
 				}
 			}
@@ -690,7 +686,7 @@ namespace Mono.Profiler.Log
 									CreateDatabase($"file:{list.dbName}?mode=memory&cache=shared", true, out list.db, out list.stmt);
 								}
 								for (var i = 0; i < len; i++) {
-									var at=(long)ReadULeb128(ref span);
+									var at = (long)ReadULeb128(ref span);
 									var to = ReadObject(ref span, _bufferHeader);
 									check_ok(list.db, raw.sqlite3_bind_int64(list.stmt, 1, hoe.HeapObjectEvent_ObjectPointer));
 									check_ok(list.db, raw.sqlite3_bind_int64(list.stmt, 2, at));
