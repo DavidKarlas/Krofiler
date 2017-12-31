@@ -183,10 +183,10 @@ namespace Krofiler
 					}
 				}
 			}
-			foreach (var root in lessImportantRoots) {
+			foreach (var lir in lessImportantRoots) {
 				if (result.Count == count)
 					break;
-				result.Add(root);
+				result.Add(lir);
 			}
 			return result;
 		}
