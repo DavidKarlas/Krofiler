@@ -15,8 +15,8 @@ namespace Krofiler
 			: base(count, size)
 		{
 			this.typeId = typeId;
-			this.mainDb = hs1.GetObjDb();
-			this.attachedDb = hs2.GetObjDb();
+			this.mainDb = hs1.GetObjsDb();
+			this.attachedDb = hs2.GetObjsDb();
 		}
 		public override IEnumerable<ObjectInfo> CreateList(string orderByColum = "Size", bool descending = true, int limit = 100)
 		{
@@ -57,8 +57,8 @@ namespace Krofiler
 			OldHeapshot = oldHs;
 			NewHeapshot = newHs;
 
-			var oldDb = oldHs.GetObjDb();
-			var fileName = raw.sqlite3_db_filename(newHs.GetObjDb(), null);
+			var oldDb = oldHs.GetObjsDb();
+			var fileName = raw.sqlite3_db_filename(newHs.GetObjsDb(), null);
 			DbUtils.check_ok(oldDb, raw.sqlite3_exec(oldDb, $"attach '{fileName}' as newDb;"));
 			DbUtils.check_ok(oldDb, raw.sqlite3_prepare_v2(oldDb, "SELECT TypeId, Count(*), Sum(Size) FROM Objs WHERE Allocation NOT IN (SELECT Allocation FROM newDb.Objs) GROUP BY TypeId", out var deadStmt));
 			int res;

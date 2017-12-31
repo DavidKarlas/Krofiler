@@ -117,10 +117,16 @@ namespace Krofiler
 			return result;
 		}
 
-		public sqlite3 GetObjDb()
+		public sqlite3 GetObjsDb()
 		{
 			indexingObjs.Wait();
 			return objsDb;
+		}
+
+		public sqlite3 GetRefsDb()
+		{
+			indexingRefs.Wait();
+			return refsDb;
 		}
 
 		public List<long> GetReferencedTo(long objAddr)
@@ -154,13 +160,18 @@ namespace Krofiler
 			var visited = new HashSet<long>();
 			visited.Add(objAddr);
 			var result = new List<long[]>(count);
+			var lessImportantRoots = new List<long[]>();
 			queue.Enqueue(new long[] { objAddr });
+			SuperEvent root;
 			while (queue.Any()) {
 				var cur = queue.Dequeue();
 				var node = cur[cur.Length - 1];
-				if (Roots.ContainsKey(node)) {
-					result.Add(cur);
-					if (--count == 0)
+				if (Roots.TryGetValue(node, out root)) {
+					if (root.HeapRootRegisterEvent_Source == LogHeapRootSource.Ephemeron || root.HeapRootRegisterEvent_Source == LogHeapRootSource.FinalizerQueue)
+						lessImportantRoots.Add(cur);
+					else
+						result.Add(cur);
+					if (result.Count == count)
 						return result;
 				}
 				foreach (var child in GetReferencedFrom(node)) {
@@ -171,6 +182,11 @@ namespace Krofiler
 						queue.Enqueue(newPath);
 					}
 				}
+			}
+			foreach (var root in lessImportantRoots) {
+				if (result.Count == count)
+					break;
+				result.Add(root);
 			}
 			return result;
 		}

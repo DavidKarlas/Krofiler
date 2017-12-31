@@ -419,8 +419,11 @@ namespace Mono.Profiler.Log
 							});
 							break;
 						case LogEventType.GCResize:
+							var val = (long)ReadULeb128(ref span);
+							if (val < 0)
+								val = uint.MaxValue - val;
 							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.GCResize) {
-								GCResizeEvent_NewSize = (long)ReadULeb128(ref span),
+								GCResizeEvent_NewSize = val,
 							});
 							break;
 						case LogEventType.GCMove: {

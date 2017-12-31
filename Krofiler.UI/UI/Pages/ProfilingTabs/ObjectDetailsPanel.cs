@@ -121,7 +121,7 @@ namespace Krofiler
 			referencesList.MouseDoubleClick += (s, e) => {
 				if (referencesList.SelectedValue is RetentionItem ri) {
 					var newTab = new ObjectListTab(session, heapshot, new Dictionary<long,LazyObjectsList>() {
-						[ri.obj.TypeId] = new SingleLazyObjectList(ri.obj.ObjAddr,ri.obj.Size )
+						[ri.obj.TypeId] = new SingleLazyObjectList(ri.obj)
 					});
 					newTab.InsertTab += InsertTab;
 					InsertTab(newTab, null);

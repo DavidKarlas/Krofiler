@@ -12,6 +12,15 @@ namespace Krofiler
 {
 	public class HomeTab : StackLayout, IProfilingTab
 	{
+		long currentGcSize = 0;
+		void CurrentSession_GCResize(TimeSpan arg1, long arg2)
+		{
+			Application.Instance.AsyncInvoke(delegate {
+				currentGcSize = arg2;
+			});
+		}
+
+
 		public KrofilerSession CurrentSession;
 		ProgressBar progressBar;
 		GridView countersView = new GridView();
@@ -146,24 +155,17 @@ namespace Krofiler
 				throw new NotSupportedException($"{profilingInfo.GetType().FullName} is not supported.");
 			}
 			CurrentSession.NewHeapshot += HandleNewHeapshot;
-			//CurrentSession.AllocationsPerSecond += AllocationsPerSecond;
 			CurrentSession.CountersDescriptionsAdded += CountersDescriptionsAdded;
 			CurrentSession.CounterSamplesAdded += CounterSamplesAdded;
+			CurrentSession.GCResize += CurrentSession_GCResize;;
 			CurrentSession.UserError += UserError;
 			CurrentSession.StartParsing();
 		}
 
-		private void AllocationsPerSecond(KrofilerSession session, TimeSpan time, double objects, double bytes)
-		{
-			if (Settings.Instance.ShowGraphs) {
-				Application.Instance.AsyncInvoke(delegate {
-					allocationsGraph.AddSample(time, objects, bytes);
-				});
-			}
-		}
 		double currentWorkingSet = 0;
 		CountersRow currentRow;
-		object GetSampleValue(SuperEvent ev)
+		CountersRow previusRow;
+		double GetSampleValue(SuperEvent ev)
 		{
 			switch (ev.CounterSamplesEvent_Type) {
 				case LogCounterType.Double:
@@ -191,7 +193,19 @@ namespace Krofiler
 					} else if (currentRow.time == obj.Time) {
 						currentRow.Counters[obj.CounterSamplesEvent_Index] = GetSampleValue(obj);
 					} else {
+						if (previusRow != null) {
+							foreach (var counter in countersDescriptions) {
+								if ((LogCounterVariance)(counter.Value.CounterDescriptionsEvent_SectionTypeUnitVariance & (7 << 28)) == LogCounterVariance.Variable) {
+									if (currentRow.Counters.ContainsKey(counter.Key))
+										currentRow.Counters[counter.Key] += previusRow.Counters[counter.Key];
+									else
+										currentRow.Counters[counter.Key] = previusRow.Counters[counter.Key];
+								}
+							}
+						}
+						currentRow.GcResize = currentGcSize;
 						((ObservableCollection<CountersRow>)countersView.DataStore).Add(currentRow);
+						previusRow = currentRow;
 						currentRow = new CountersRow();
 						currentRow.time = obj.Time;
 						currentRow.Counters[obj.CounterSamplesEvent_Index] = GetSampleValue(obj);
@@ -208,29 +222,67 @@ namespace Krofiler
 		class CountersRow
 		{
 			public TimeSpan time;
-			public Dictionary<long, object> Counters = new Dictionary<long, object>();
+			public Dictionary<long, double> Counters = new Dictionary<long, double>();
+			internal long GcResize;
 		}
-
+		Dictionary<long, SuperEvent> countersDescriptions = new Dictionary<long, SuperEvent>();
 		private void CountersDescriptionsAdded(SuperEvent item)
 		{
+			countersDescriptions[item.CounterDescriptionsEvent_Index] = item;
 			Application.Instance.AsyncInvoke(delegate {
 				if (Settings.Instance.ShowPerformanceCounters) {
-					if (countersView.Columns.Count == 0)
+					if (countersView.Columns.Count == 0) {
 						countersView.Columns.Add(new GridColumn() {
 							Resizable = true,
 							AutoSize = true,
 							Editable = false,
-							HeaderText = "Time sice start",
+							HeaderText = "Time since start",
 							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
 						});
-
+						countersView.Columns.Add(new GridColumn() {
+							Resizable = true,
+							AutoSize = true,
+							Editable = false,
+							HeaderText = "GCResize",
+							DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => PrettyPrint.PrintBytes( r.GcResize)) },
+						});
+					}
+					switch (item.GetCounterName(CurrentSession.processor)) {
+						case "Private Bytes":
+						case "Working Set":
+						case "Page File Bytes":
+						case "Valloc code":
+						case "Valloc domain":
+						case "Valloc SGen internal":
+						case "Valloc SGen nursery":
+						case "Valloc SGen LOS":
+						case "Valloc SGen mark&sweep":
+						case "Valloc SGen card table":
+						case "Valloc SGen shadow card table":
+						case "Valloc SGen debugging":
+						case "Valloc SGen binary protocol":
+						case "Valloc exceptions":
+						case "Valloc profiler":
+						case "Valloc other":
+							break;
+						default:
+							return;
+					}
 					countersView.Columns.Add(new GridColumn() {
 						Resizable = true,
 						AutoSize = false,
 						Editable = false,
 						Sortable = true,
 						HeaderText = item.GetCounterName(CurrentSession.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(CurrentSession.processor)}",
-						DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index) ? r.Counters[item.CounterDescriptionsEvent_Index].ToString() : "") },
+						DataCell = new TextBoxCell {
+							Binding = Binding.Delegate<CountersRow, string>(r => {
+								if (!r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index))
+									return "";
+								if (((LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (31 << 24))) == LogCounterUnit.Bytes)
+									return PrettyPrint.PrintBytes((long)r.Counters[item.CounterDescriptionsEvent_Index]);
+								return r.Counters[item.CounterDescriptionsEvent_Index].ToString();
+							}),
+						}
 					});
 				}
 			});

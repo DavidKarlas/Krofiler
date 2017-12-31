@@ -279,7 +279,16 @@ namespace Krofiler
 			{
 				session.methodsNames[ev.JitEvent_MethodPointer] = ev.JitEvent_Name;
 			}
+			long oldSize = 0;
+			public override void VisitGCResizeEvent(SuperEvent ev)
+			{
+				if (ev.GCResizeEvent_NewSize == oldSize)
+					return;
+				oldSize = ev.GCResizeEvent_NewSize;
+				session.GCResize?.Invoke(ev.Time, ev.GCResizeEvent_NewSize);
+			}
 		}
+		public event Action<TimeSpan, long> GCResize;
 
 		CancellationTokenSource cts = new CancellationTokenSource();
 		Thread parsingThread;

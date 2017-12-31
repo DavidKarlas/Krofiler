@@ -108,7 +108,7 @@ namespace Krofiler
 			if (selectedItem == null) {
 				return;
 			}
-			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1].CreateList().Select(t => heapshot.GetObjectInfo(t));
+			objectsGrid.DataStore = typesToObjectsListMap[selectedItem.Item1].CreateList().ToList();
 			objectsGrid.SelectedRows = Array.Empty<int>();
 			objectsGrid.SelectRow(0);
 		}
