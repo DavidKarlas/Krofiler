@@ -822,6 +822,9 @@ namespace Mono.Profiler.Log
 					switch (extType) {
 						case LogEventType.RuntimeJitHelper: {
 								var helperType = (LogJitHelper)(byte)*span++;
+								if (StreamHeader.FormatVersion < 14)
+									helperType--;
+
 								list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.JitHelper) {
 									JitHelperEvent_Type = helperType,
 									JitHelperEvent_BufferPointer = ReadPointer(ref span, _bufferHeader),
