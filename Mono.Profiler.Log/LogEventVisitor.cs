@@ -52,7 +52,8 @@ namespace Mono.Profiler.Log
 		CounterDescriptions,
 		UnmanagedBinary,
 		UnmanagedSymbol,
-		SynchronizationPoint
+		SynchronizationPoint,
+		MetaAotId,
 	}
 
 	public abstract class LogEventVisitor
@@ -233,6 +234,10 @@ namespace Mono.Profiler.Log
 		{
 		}
 
+		public virtual void VisitMetaAotId(SuperEvent ev)
+		{
+		}
+
 		internal void VisitSuper(SuperEvent superEvent)
 		{
 			switch ((LogEventId)(superEvent.TimestampAndType & 0xff)) {
@@ -367,6 +372,9 @@ namespace Mono.Profiler.Log
 					break;
 				case LogEventId.SynchronizationPoint:
 					VisitSynchronizationPointEvent(superEvent);
+					break;
+				case LogEventId.MetaAotId:
+					VisitMetaAotId(superEvent);
 					break;
 				default:
 					throw new NotImplementedException((superEvent.TimestampAndType & 0xff).ToString());
