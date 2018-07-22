@@ -516,6 +516,7 @@ namespace Mono.Profiler.Log
 									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ImageLoad) {
 										ImageLoadEvent_ImagePointer = ReadPointer(ref span, _bufferHeader),
 										ImageLoadEvent_Name = ReadCString(ref span, _bufferHeader),
+										ImageLoadEvent_ModuleVersionId_Guid = ReadCString(ref span, _bufferHeader),
 									});
 								} else if (unload) {
 									list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.ImageUnload) {
@@ -680,7 +681,8 @@ namespace Mono.Profiler.Log
 								var hoe = new SuperEvent(shiftedTime | (byte)LogEventId.HeapObject) {
 									HeapObjectEvent_ObjectPointer = ReadObject(ref span, _bufferHeader),
 									HeapObjectEvent_VTablePointer = ReadPointer(ref span, _bufferHeader),
-									HeapObjectEvent_ObjectSize = (long)ReadULeb128(ref span)
+									HeapObjectEvent_ObjectSize = (long)ReadULeb128(ref span),
+									HeapObjectEvent_Generation = (int)*span++,
 								};
 
 								var len = (int)ReadULeb128(ref span);
@@ -842,6 +844,11 @@ namespace Mono.Profiler.Log
 						case LogEventType.MetaSynchronizationPoint:
 							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.SynchronizationPoint) {
 								SynchronizationPointEvent_Type = (LogSynchronizationPoint)(byte)*span++,
+							});
+							break;
+						case LogEventType.MetaAotId:
+							list.Add(new SuperEvent(shiftedTime | (byte)LogEventId.MetaAotId) {
+								MetaAotId_AotId_Guid = ReadCString(ref span, _bufferHeader),
 							});
 							break;
 						default:

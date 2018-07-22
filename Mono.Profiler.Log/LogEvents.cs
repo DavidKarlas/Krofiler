@@ -56,6 +56,8 @@ namespace Mono.Profiler.Log
 		public long ImageLoadEvent_ImagePointer;
 		[FieldOffset(16)]
 		public ulong ImageLoadEvent_Name;
+		[FieldOffset(24)]
+		public ulong ImageLoadEvent_ModuleVersionId_Guid;
 
 		[FieldOffset(8)]
 		public long ImageUnloadEvent_ImagePointer;
@@ -126,6 +128,8 @@ namespace Mono.Profiler.Log
 		public long HeapObjectEvent_VTablePointer;
 		[FieldOffset(24)]
 		public long HeapObjectEvent_ObjectSize;
+		[FieldOffset(32)]
+		public int HeapObjectEvent_Generation;
 
 		[FieldOffset(8)]
 		public long HeapRootsEvent_AddressPointer;
@@ -265,6 +269,9 @@ namespace Mono.Profiler.Log
 
 		[FieldOffset(8)]
 		public LogSynchronizationPoint SynchronizationPointEvent_Type;
+
+		[FieldOffset(8)]
+		public ulong MetaAotId_AotId_Guid;
 
 		public TimeSpan Time { get => TimeSpan.FromTicks((long)(TimestampAndType >> 8) / 100); }
 
