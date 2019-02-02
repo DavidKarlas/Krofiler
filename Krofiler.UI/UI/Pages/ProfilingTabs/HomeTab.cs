@@ -349,6 +349,19 @@ namespace Krofiler
 				await CurrentSession.TakeHeapShot();
 			};
 
+
+			var dumpMethodPointersAndNames = new Command() {
+				MenuText = "Dump method pointers and names"
+			};
+			dumpMethodPointersAndNames.Executed += async delegate {
+				var saveFileDialog = new SaveFileDialog();
+
+				if (saveFileDialog.ShowDialog(this) != DialogResult.Ok)
+					return;
+
+				CurrentSession.DumpMethods(saveFileDialog.FileName);
+			};
+
 			var killProfilee = new Command {
 				MenuText = "Kill profilee"
 			};
@@ -372,6 +385,10 @@ namespace Krofiler
 			commandButtonsStack.Items.Add(new Button() {
 				Command = takeHeapshot,
 				Text = "Take Heapshot"
+			});
+			commandButtonsStack.Items.Add(new Button() {
+				Command = dumpMethodPointersAndNames,
+				Text = "Dump method pointers and names"
 			});
 			commandButtonsStack.Items.Add(new Button() {
 				Command = killProfilee,
