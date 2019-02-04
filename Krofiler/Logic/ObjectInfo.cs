@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -47,12 +47,6 @@ namespace Krofiler
 				return BitConverter.ToUInt64(bytes, 0);
 			}
 		}
-	}
-
-	public class Allocation
-	{
-		public long Time;
-		public long[] Backtrace;
 	}
 }
 

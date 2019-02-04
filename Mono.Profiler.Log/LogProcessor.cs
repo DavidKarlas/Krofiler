@@ -402,8 +402,7 @@ namespace Mono.Profiler.Log
 								AllocationEvent_ObjectSize = ReadULeb128(ref span),
 								AllocationEvent_FilePointer = (ulong)fs.Position | filePrefix
 							});
-							var time = _bufferHeader.CurrentTime;
-							fs.Write(BitConverter.GetBytes(time), 0, 8);
+							fs.Write(BitConverter.GetBytes(_time), 0, 8);
 							ReadBacktrace(extType == LogEventType.AllocationBacktrace, ref span, _bufferHeader, fs, filePrefix);
 							break;
 						default:

@@ -1,12 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Eto.Forms;
+using Mono.Profiler.Log;
 
 namespace Krofiler
 {
-	public class ObjectListTab : Splitter, IProfilingTab
+	public class ObjectListTab : StackLayout, IProfilingTab
 	{
 		readonly KrofilerSession session;
 		readonly Heapshot heapshot;
@@ -17,22 +18,60 @@ namespace Krofiler
 		string typeNameFilter;
 		ObjectDetailsPanel objectPanel;
 		readonly Dictionary<long, LazyObjectsList> typesToObjectsListMap;
+		Label sumLabel = new Label();
+		GridView countersView = new GridView();
+		Splitter splitter = new Splitter();
 
 		public ObjectListTab(KrofilerSession session, Heapshot heapshot, Dictionary<long, LazyObjectsList> typesToObject)
 		{
+			countersView.DataStore = new ObservableCollection<CountersRow>();
+			countersView.Columns.Add(new GridColumn() {
+				Resizable = true,
+				AutoSize = true,
+				Editable = false,
+				HeaderText = "Time since start",
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => r.time.ToString()) },
+			});
+			countersView.Columns.Add(new GridColumn() {
+				Resizable = true,
+				AutoSize = true,
+				Editable = false,
+				HeaderText = "GCResize",
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => PrettyPrint.PrintBytes(r.GcResize)) },
+			});
+			foreach (var counterDescription in heapshot.CountersDescriptions) {
+				var item = counterDescription.Value;
+				countersView.Columns.Add(new GridColumn() {
+					Resizable = true,
+					AutoSize = false,
+					Editable = false,
+					Sortable = true,
+					HeaderText = item.GetCounterName(session.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(session.processor)}",
+					DataCell = new TextBoxCell {
+						Binding = Binding.Delegate<CountersRow, string>(r => {
+							if (!r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index))
+								return "";
+							if (((LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (31 << 24))) == LogCounterUnit.Bytes)
+								return PrettyPrint.PrintBytes((long)r.Counters[item.CounterDescriptionsEvent_Index]);
+							return r.Counters[item.CounterDescriptionsEvent_Index].ToString();
+						}),
+					}
+				});
+			}
+			((ObservableCollection<CountersRow>)countersView.DataStore).Add(heapshot.Counters);
 			this.typesToObjectsListMap = typesToObject;
 			this.session = session;
 			this.heapshot = heapshot;
-			this.Orientation = Orientation.Horizontal;
 			CreateTypesView();
 			filterTypesTextBox = new TextBox();
 			filterTypesTextBox.TextChanged += FilterTypesTextBox_TextChanged;
-			this.SplitterWidth = 10;
+			splitter.SplitterWidth = 10;
 			var filterAndTypesStackLayout = new StackLayout();
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(filterTypesTextBox, HorizontalAlignment.Stretch));
+			filterAndTypesStackLayout.Items.Add(sumLabel);
 			filterAndTypesStackLayout.Items.Add(new StackLayoutItem(typesGrid, HorizontalAlignment.Stretch, true));
 
-			this.Panel1 = filterAndTypesStackLayout;
+			splitter.Panel1 = filterAndTypesStackLayout;
 			CreateObjectsView();
 			var splitter2 = new Splitter() {
 				Orientation = Orientation.Horizontal
@@ -42,8 +81,10 @@ namespace Krofiler
 			objectPanel = new ObjectDetailsPanel(session, this.heapshot);
 			objectPanel.InsertTab += (a, b) => InsertTab?.Invoke(a, b ?? this);
 			splitter2.Panel2 = objectPanel;
-			Panel2 = splitter2;
-			this.Position = (int)Screen.PrimaryScreen.Bounds.Width / 3;
+			splitter.Panel2 = splitter2;
+			splitter.Position = (int)Screen.PrimaryScreen.Bounds.Width / 3;
+			this.Items.Add(new StackLayoutItem(splitter, HorizontalAlignment.Stretch, true));
+			this.Items.Add(new StackLayoutItem(countersView, HorizontalAlignment.Stretch, false));
 		}
 
 		public string Title {
@@ -77,9 +118,16 @@ namespace Krofiler
 
 		void CreateTypesView()
 		{
+			int countSum = 0;
+			long sizeSum = 0;
 			foreach (var type in typesToObjectsListMap) {
-				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), type.Value.Count, type.Value.Size));
+				long size = type.Value.Size;
+				int count = type.Value.Count;
+				typesCollection.Add(Tuple.Create(type.Key, session.GetTypeName(type.Key), count, size));
+				sizeSum += size;
+				countSum += count;
 			}
+			sumLabel.Text = $"Object # sum:{countSum:N0} Size sum:{PrettyPrint.PrintBytes(sizeSum)}";
 			typesCollection.Sort = (x, y) => (y.Item4).CompareTo(x.Item4);
 			typesGrid = new GridView {
 				DataStore = typesCollection
@@ -87,7 +135,7 @@ namespace Krofiler
 			typesGrid.AllowMultipleSelection = false;
 
 			typesGrid.Columns.Add(new GridColumn {
-				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => r.Item3.ToString()) },
+				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => r.Item3.ToString("N0")) },
 				HeaderText = "Objects #"
 			});
 			typesGrid.Columns.Add(new GridColumn {
@@ -98,7 +146,6 @@ namespace Krofiler
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<Tuple<long, string, int, long>, string>(r => r.Item2) },
 				HeaderText = "Type Name"
 			});
-
 			typesGrid.SelectedRowsChanged += Grid_SelectedRowsChanged;
 		}
 

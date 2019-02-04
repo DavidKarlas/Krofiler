@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -157,7 +157,7 @@ namespace Krofiler
 
 			public override void VisitHeapBeginEvent(SuperEvent ev)
 			{
-				currentHeapshot = new Heapshot(session, ++heapshotCounter);
+				currentHeapshot = new Heapshot(session, ++heapshotCounter, ev.Time);
 				deadObjs = new HashSet<long>(allocationsTracker.Keys);
 				Console.WriteLine($"HeapBeginEvent({currentHeapshot.Name}): {DateTime.Now}");
 			}

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using Eto.Forms;
 using System.Linq;
 using System.Collections.Generic;
 
 namespace Krofiler
 {
-	public class ObjectDetailsPanel : TabControl
+	public class ObjectDetailsPanel : StackLayout
 	{
 		readonly KrofilerSession session;
 		readonly Heapshot heapshot;
@@ -13,6 +13,7 @@ namespace Krofiler
 		ListBox referencesList;
 		TabControl retentionPaths;
 		public event InsertTabDelegate InsertTab;
+		Label detailsLabel = new Label();
 
 		ObjectInfo objectInfo;
 		public ObjectInfo Object {
@@ -36,6 +37,9 @@ namespace Krofiler
 
 		void OnObjectIdChanged()
 		{
+			var allocationTimestamp = TimeSpan.FromTicks((long)(objectInfo.AllocationTimestamp(session) / 100));
+			var heapShotFirstSeen = session.Heapshots.FirstOrDefault(h => h.Time > allocationTimestamp);
+			detailsLabel.Text = "Allocation time:" + allocationTimestamp + " first seen in Heapshot: " + heapShotFirstSeen?.Name;
 			stacktraceView.Items.Clear();
 			var sf = objectInfo.Backtrace(session).Reverse().Select(b => session.GetMethodName(b));
 			foreach (var f in sf) {
@@ -82,7 +86,7 @@ namespace Krofiler
 		private static Dictionary<long, LazyObjectsList> CreateObjectList(ObjectInfo obj)
 		{
 			return new Dictionary<long, LazyObjectsList>() {
-				[obj.TypeId] =new SingleLazyObjectList(obj)
+				[obj.TypeId] = new SingleLazyObjectList(obj)
 			};
 		}
 
@@ -104,18 +108,20 @@ namespace Krofiler
 
 		public ObjectDetailsPanel(KrofilerSession session, Heapshot heapshot)
 		{
+			Items.Add(detailsLabel);
+			var tabControl = new TabControl();
 			this.heapshot = heapshot;
 			this.session = session;
 			retentionPaths = new TabControl();
-			Pages.Add(new TabPage(retentionPaths) {
+			tabControl.Pages.Add(new TabPage(retentionPaths) {
 				Text = "Retension Paths"
 			});
 			stacktraceView = new ListBox();
-			Pages.Add(new TabPage(stacktraceView) {
+			tabControl.Pages.Add(new TabPage(stacktraceView) {
 				Text = "Creation Stacktrace"
 			});
 			referencesList = new ListBox();
-			Pages.Add(new TabPage(referencesList) {
+			tabControl.Pages.Add(new TabPage(referencesList) {
 				Text = "References"
 			});
 			referencesList.MouseDoubleClick += (s, e) => {
@@ -127,6 +133,7 @@ namespace Krofiler
 					InsertTab(newTab, null);
 				}
 			};
+			Items.Add(new StackLayoutItem(tabControl, HorizontalAlignment.Stretch, true));
 		}
 	}
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -11,9 +11,10 @@ namespace Krofiler
 {
 	public class Heapshot
 	{
-		public Heapshot(KrofilerSession session, int id)
+		public Heapshot(KrofilerSession session, int id, TimeSpan time)
 		{
 			Id = id;
+			Time = time;
 			Session = session;
 			var file = Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db");
 			var rc = raw.sqlite3_open_v2($"file:{file}", out objsDb, raw.SQLITE_OPEN_CREATE | raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE, null);
@@ -150,6 +151,7 @@ namespace Krofiler
 
 		public KrofilerSession Session { get; }
 		public int Id { get; }
+		public TimeSpan Time { get; }
 
 		List<long[]> cachedResult;
 		long cachedAddr;
@@ -256,5 +258,15 @@ namespace Krofiler
 				return cachedTypesToObjectsListMap;
 			}
 		}
+
+		public Dictionary<long, SuperEvent> CountersDescriptions { get; set; }
+		public CountersRow Counters { get; set; }
+	}
+
+	public class CountersRow
+	{
+		public TimeSpan time;
+		public Dictionary<long, double> Counters = new Dictionary<long, double>();
+		internal long GcResize;
 	}
 }
