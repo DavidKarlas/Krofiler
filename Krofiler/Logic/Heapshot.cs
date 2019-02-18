@@ -173,8 +173,11 @@ namespace Krofiler
 						lessImportantRoots.Add(cur);
 					else
 						result.Add(cur);
-					if (result.Count == count)
+
+					if (result.Count == count) {
+						result.Sort(sortByLength);
 						return result;
+					}
 				}
 				foreach (var child in GetReferencedFrom(node)) {
 					if (visited.Add(child)) {
@@ -185,6 +188,8 @@ namespace Krofiler
 					}
 				}
 			}
+			result.Sort(sortByLength);
+			lessImportantRoots.Sort(sortByLength);
 			foreach (var lir in lessImportantRoots) {
 				if (result.Count == count)
 					break;
@@ -192,6 +197,8 @@ namespace Krofiler
 			}
 			return result;
 		}
+
+		static readonly Comparison<long[]> sortByLength = (x, y) => x.Length.CompareTo(y.Length);
 
 		public List<long[]> GetTop5PathsToRoots(long addr)
 		{

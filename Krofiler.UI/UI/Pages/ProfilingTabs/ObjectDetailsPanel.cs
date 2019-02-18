@@ -49,7 +49,7 @@ namespace Krofiler
 			retentionPaths.Pages.Clear();
 			var pathsToRoot = heapshot.GetTop5PathsToRoots(objectInfo.ObjAddr);
 			int i = 0;
-			foreach (var path in pathsToRoot.OrderBy(p => p.Count())) {
+			foreach (var path in pathsToRoot) {
 				i++;
 				var listBox = new ListBox();
 				listBox.MouseDoubleClick += (s, e) => {
