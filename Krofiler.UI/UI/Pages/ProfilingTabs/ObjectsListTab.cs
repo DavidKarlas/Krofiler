@@ -39,26 +39,30 @@ namespace Krofiler
 				HeaderText = "GCResize",
 				DataCell = new TextBoxCell { Binding = Binding.Delegate<CountersRow, string>(r => PrettyPrint.PrintBytes(r.GcResize)) },
 			});
-			foreach (var counterDescription in heapshot.CountersDescriptions) {
-				var item = counterDescription.Value;
-				countersView.Columns.Add(new GridColumn() {
-					Resizable = true,
-					AutoSize = false,
-					Editable = false,
-					Sortable = true,
-					HeaderText = item.GetCounterName(session.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(session.processor)}",
-					DataCell = new TextBoxCell {
-						Binding = Binding.Delegate<CountersRow, string>(r => {
-							if (!r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index))
-								return "";
-							if (((LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (31 << 24))) == LogCounterUnit.Bytes)
-								return PrettyPrint.PrintBytes((long)r.Counters[item.CounterDescriptionsEvent_Index]);
-							return r.Counters[item.CounterDescriptionsEvent_Index].ToString();
-						}),
-					}
-				});
+			if (heapshot.CountersDescriptions != null) {
+				foreach (var counterDescription in heapshot.CountersDescriptions) {
+					var item = counterDescription.Value;
+					countersView.Columns.Add(new GridColumn() {
+						Resizable = true,
+						AutoSize = false,
+						Editable = false,
+						Sortable = true,
+						HeaderText = item.GetCounterName(session.processor) + $"({(LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (0xF << 24))}) {item.GetSectionName(session.processor)}",
+						DataCell = new TextBoxCell {
+							Binding = Binding.Delegate<CountersRow, string>(r => {
+								if (!r.Counters.ContainsKey(item.CounterDescriptionsEvent_Index))
+									return "";
+								if (((LogCounterUnit)(item.CounterDescriptionsEvent_SectionTypeUnitVariance & (31 << 24))) == LogCounterUnit.Bytes)
+									return PrettyPrint.PrintBytes((long)r.Counters[item.CounterDescriptionsEvent_Index]);
+								return r.Counters[item.CounterDescriptionsEvent_Index].ToString();
+							}),
+						}
+					});
+				}
 			}
-			((ObservableCollection<CountersRow>)countersView.DataStore).Add(heapshot.Counters);
+			if (heapshot.Counters != null) {
+				((ObservableCollection<CountersRow>)countersView.DataStore).Add(heapshot.Counters);
+			}
 			this.typesToObjectsListMap = typesToObject;
 			this.session = session;
 			this.heapshot = heapshot;
