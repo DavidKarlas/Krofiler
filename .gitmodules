@@ -1,3 +1,0 @@
-[submodule "external/heap-shot"]
-	path = external/heap-shot
-	url = https://github.com/mono/heap-shot.git
