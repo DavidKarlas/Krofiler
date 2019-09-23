@@ -15,7 +15,7 @@ namespace Krofiler
 			listbox.MouseDoubleClick += delegate {
 				ActivatedItem?.Invoke(listbox.SelectedKey);
 			};
-			listbox.Items.AddRange(filenames.Where(File.Exists).Select(s => new ListItem() {
+			listbox.Items.AddRange(filenames.Where(p => Directory.Exists(p) || File.Exists(p)).Select(s => new ListItem() {
 				Text = s,
 				Key = s
 			}));

@@ -45,7 +45,7 @@ namespace Krofiler
 				var openFileDialog = new OpenFileDialog();
 				openFileDialog.CheckFileExists = true;
 				openFileDialog.MultiSelect = false;
-				openFileDialog.Filters.Add(new FileDialogFilter(".exe application", "exe"));
+				//openFileDialog.Filters.Add(new FileDialogFilter(".exe application", "exe"));
 				if (DialogResult.Ok == openFileDialog.ShowDialog(this)) {
 					StartProcess(openFileDialog.FileName);
 				}

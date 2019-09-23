@@ -16,10 +16,14 @@ namespace Krofiler
 			LogFilePath = Path.Combine(options.OutputDir, $"{Path.GetFileName(exePath)}_{DateTime.Now.ToString("yyyy-MM-dd__HH-mm-ss")}.mlpd");
 			profileProcess = new Process();
 			profileProcess.StartInfo.UseShellExecute = false;
-			profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
-			//profileProcess.StartInfo.WorkingDirectory = "/Users/davidkarlas/GIT/mono/mcs/mcs/";
-			//profileProcess.StartInfo.EnvironmentVariables["MONO_GC_PARAMS"] = "cementing";
-			profileProcess.StartInfo.Arguments = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"{LogFilePath}\" \"{exePath}\" {args}";
+			var profileOptions = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"{LogFilePath}\"";
+			profileProcess.StartInfo.EnvironmentVariables["MONO_ENV_OPTIONS"] = profileOptions;
+			if (exePath.EndsWith(".exe", StringComparison.Ordinal)) {
+				profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
+			} else {
+				profileProcess.StartInfo.FileName = "open";
+			}
+			profileProcess.StartInfo.Arguments = $"\"{exePath}\" {args}";
 			profileProcess.Start();
 		}
 
