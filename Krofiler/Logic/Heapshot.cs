@@ -169,7 +169,9 @@ namespace Krofiler
 				var cur = queue.Dequeue();
 				var node = cur[cur.Length - 1];
 				if (Roots.TryGetValue(node, out root)) {
-					if (root.HeapRootRegisterEvent_Source == LogHeapRootSource.Ephemeron || root.HeapRootRegisterEvent_Source == LogHeapRootSource.FinalizerQueue)
+					if (root.HeapRootRegisterEvent_Source == LogHeapRootSource.Ephemeron ||
+						root.HeapRootRegisterEvent_Source == LogHeapRootSource.FinalizerQueue ||
+						root.HeapRootRegisterEvent_Source == LogHeapRootSource.GCHandle)
 						lessImportantRoots.Add(cur);
 					else
 						result.Add(cur);
@@ -209,7 +211,7 @@ namespace Krofiler
 			//if (Roots.ContainsKey(addr)) {
 			//	return cachedResult;
 			//}
-			cachedResult = SearchRoot(addr, 5);
+			cachedResult = SearchRoot(addr, 10);
 			return cachedResult;
 		}
 
