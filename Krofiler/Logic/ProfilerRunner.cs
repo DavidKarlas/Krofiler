@@ -16,7 +16,7 @@ namespace Krofiler
 			LogFilePath = Path.Combine(options.OutputDir, $"{Path.GetFileName(exePath)}_{DateTime.Now.ToString("yyyy-MM-dd__HH-mm-ss")}.mlpd");
 			profileProcess = new Process();
 			profileProcess.StartInfo.UseShellExecute = false;
-			var profileOptions = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"{LogFilePath}\" ";
+			var profileOptions = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"+{LogFilePath}\" ";
 			if (exePath.EndsWith(".exe", StringComparison.Ordinal)) {
 				profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
 				profileProcess.StartInfo.Arguments = profileOptions;
@@ -27,6 +27,7 @@ namespace Krofiler
 			}
 			profileProcess.StartInfo.Arguments += $"\"{exePath}\" {args}";
 			profileProcess.Start();
+			LogFilePath += "." + profileProcess.Id;
 		}
 
 		internal void Kill()
