@@ -20,6 +20,8 @@ namespace Krofiler
 			});
 		}
 
+		StackLayout stackLayout = new StackLayout();
+
 		public KrofilerSession CurrentSession;
 		ProgressBar progressBar;
 		GridView countersView = new GridView();
@@ -33,7 +35,7 @@ namespace Krofiler
 		public HomeTab()
 		{
 			Orientation = Orientation.Horizontal;
-			Items.Add(new StackLayoutItem(randomStuff, HorizontalAlignment.Stretch));
+			Items.Add(new StackLayoutItem(stackLayout, HorizontalAlignment.Stretch));
 			if (Settings.Instance.ShowPerformanceCounters)
 				Items.Add(new StackLayoutItem(countersView, VerticalAlignment.Stretch, true));
 			else if (Settings.Instance.ShowGraphs) {
@@ -60,9 +62,8 @@ namespace Krofiler
 			};
 			timer.Elapsed += UpdateParsingProgress;
 			timer.Start();
-			randomStuff.Items.Add(progressBar);
 
-			var stackLayout = new StackLayout();
+			stackLayout.Items.Add(new StackLayoutItem(progressBar, HorizontalAlignment.Stretch, true));
 			stackLayout.Items.Add(new Label { Text = "Select to compare" });
 			stackLayout.Items.Add(new Label { Text = "or double click." });
 			var listBoxsSplitter = new StackLayout { Orientation = Orientation.Horizontal };
@@ -106,10 +107,8 @@ namespace Krofiler
 				InsertTab(new CompareHeapshotsTab(CurrentSession, (Heapshot)left, (Heapshot)right), this);
 			};
 			stackLayout.Items.Add(compareButton);
-			randomStuff.Items.Add(stackLayout);
 		}
 
-		StackLayout randomStuff = new StackLayout();
 		UITimer timer;
 
 		public string Title {
@@ -319,6 +318,7 @@ namespace Krofiler
 			base.OnLoad(e);
 			if (commandButtonsStack != null)
 				return;
+#if MAC
 			var sampleCpu = new Command() {
 				MenuText = "Start CPU Sample"
 			};
@@ -338,6 +338,7 @@ namespace Krofiler
 					InsertTab(new CpuSamplingTab(CurrentSession, samplingResult), this);
 				}
 			};
+#endif
 			var takeHeapshot = new Command() {
 				MenuText = "Take Heapshot"
 			};

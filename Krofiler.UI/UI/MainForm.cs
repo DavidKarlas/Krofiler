@@ -81,11 +81,13 @@ namespace Krofiler
 				},
 				QuitItem = quitCommand,
 				AboutItem = aboutCommand,
+#if MAC
 				HelpItems = {
 					new ButtonMenuItem{ Text="Profile for 5 seconds", Command= new Command(delegate {
 						UIThreadMonitor.Profile (5);
 					})}
 				}
+#endif
 			};
 
 			var mainTabControl = new TabControl();

@@ -19,7 +19,7 @@ namespace Krofiler
 			var file = Path.Combine(Session.processor.cacheFolder, $"Heapshot_{Id}.db");
 			var rc = raw.sqlite3_open_v2($"file:{file}", out objsDb, raw.SQLITE_OPEN_CREATE | raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE, null);
 			if (rc != raw.SQLITE_OK)
-				throw new Exception(raw.sqlite3_errstr(rc));
+				throw new Exception(raw.sqlite3_errstr(rc).utf8_to_string());
 			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA synchronous=OFF"));
 			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA count_changes=OFF"));
 			check_ok(objsDb, raw.sqlite3_exec(objsDb, "PRAGMA journal_mode=OFF"));
@@ -56,7 +56,7 @@ namespace Krofiler
 			check_ok(objsDb, raw.sqlite3_exec(objsDb, "COMMIT TRANSACTION;"));
 			var rc = raw.sqlite3_open_v2($"file:{Path.Combine(Session.processor.cacheFolder, $"HeapshotRefs_{Id}.db")}", out refsDb, raw.SQLITE_OPEN_URI | raw.SQLITE_OPEN_READWRITE, null);
 			if (rc != raw.SQLITE_OK)
-				throw new Exception(raw.sqlite3_errstr(rc));
+				throw new Exception(raw.sqlite3_errstr(rc).utf8_to_string());
 			//raw.sqlite3_progress_handler(refsDb,)
 			indexingObjs = Task.Run(() => {
 				check_ok(objsDb, raw.sqlite3_exec(objsDb, @"CREATE INDEX ObjsAddress ON Objs (Address)"));
@@ -98,7 +98,7 @@ namespace Krofiler
 		private static void check_ok(sqlite3 db, int rc)
 		{
 			if (raw.SQLITE_OK != rc)
-				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
+				throw new Exception(raw.sqlite3_errstr(rc).utf8_to_string() + ": " + raw.sqlite3_errmsg(db).utf8_to_string());
 		}
 
 		Dictionary<long, long[]> refsFromCache = new Dictionary<long, long[]>();

@@ -171,7 +171,7 @@ namespace Mono.Profiler.Log
 								if (File.Exists(dbFileName))
 									File.Delete(dbFileName);
 								CreateDatabase($"file:{dbFileName}", false, out db, out var stmt);
-								maxAttachedDbs = sqlite3_limit(db.ptr, 7, -1);
+								maxAttachedDbs = sqlite3_limit(db.DangerousGetHandle(), 7, -1);
 							}
 							void MergeDatabase()
 							{
@@ -862,7 +862,7 @@ namespace Mono.Profiler.Log
 		private static void check_ok(sqlite3 db, int rc)
 		{
 			if (raw.SQLITE_OK != rc)
-				throw new Exception(raw.sqlite3_errstr(rc) + ": " + raw.sqlite3_errmsg(db));
+				throw new Exception(raw.sqlite3_errstr(rc).utf8_to_string() + ": " + raw.sqlite3_errmsg(db).utf8_to_string());
 		}
 
 		private void CreateDatabase(string name, bool createStatement, out sqlite3 db, out sqlite3_stmt stmt)
