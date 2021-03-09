@@ -8,8 +8,7 @@ namespace Krofiler.Wpf
 		[STAThread]
 		public static void Main (string[] args)
 		{
-			var app = new Application(Eto.Platforms.Wpf);
-			app.Run (new MainForm ());
+			new Application (Eto.Platforms.Wpf).Run (new MainForm ());
 		}
 	}
 }

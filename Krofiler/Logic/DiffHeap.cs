@@ -21,7 +21,7 @@ namespace Krofiler
 		public override IEnumerable<ObjectInfo> CreateList(string orderByColum = "Size", bool descending = true, int limit = 100)
 		{
 			var fileName = raw.sqlite3_db_filename(attachedDb, null);
-			DbUtils.check_ok(mainDb, raw.sqlite3_exec(mainDb, $"attach '{fileName.utf8_to_string()}' as attachedDb;"));
+			DbUtils.check_ok(mainDb, raw.sqlite3_exec(mainDb, $"attach '{fileName}' as attachedDb;"));
 			var result = new List<ObjectInfo>(limit);
 			sqlite3_stmt query;
 			if(string.IsNullOrEmpty(orderByColum))
@@ -59,7 +59,7 @@ namespace Krofiler
 
 			var oldDb = oldHs.GetObjsDb();
 			var fileName = raw.sqlite3_db_filename(newHs.GetObjsDb(), null);
-			DbUtils.check_ok(oldDb, raw.sqlite3_exec(oldDb, $"attach '{fileName.utf8_to_string()}' as newDb;"));
+			DbUtils.check_ok(oldDb, raw.sqlite3_exec(oldDb, $"attach '{fileName}' as newDb;"));
 			DbUtils.check_ok(oldDb, raw.sqlite3_prepare_v2(oldDb, "SELECT TypeId, Count(*), Sum(Size) FROM Objs WHERE Allocation NOT IN (SELECT Allocation FROM newDb.Objs) GROUP BY TypeId", out var deadStmt));
 			int res;
 			while ((res = raw.sqlite3_step(deadStmt)) == raw.SQLITE_ROW) {

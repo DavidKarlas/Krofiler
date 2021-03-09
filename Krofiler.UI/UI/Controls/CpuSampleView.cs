@@ -1,5 +1,4 @@
-﻿#if MAC
-using System;
+﻿using System;
 using Eto.Forms;
 using Krofiler.CpuSampling;
 using Eto.Drawing;
@@ -28,8 +27,7 @@ namespace Krofiler
 
 		void RecursivlyDrawChildren(Graphics g, SampleFrame frame, float x, float y, float width)
 		{
-			for (int i = 0; i < frame.Children.Count; i++)
-			{
+			for (int i = 0; i < frame.Children.Count; i++) {
 				var child = frame.Children[i];
 				var childWidth = width * child.Value / frame.Value;
 				g.DrawRectangle(Colors.Orange, x, y, childWidth, frameHeight);
@@ -43,4 +41,3 @@ namespace Krofiler
 		}
 	}
 }
-#endif

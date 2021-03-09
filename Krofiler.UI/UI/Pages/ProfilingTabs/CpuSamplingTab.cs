@@ -1,5 +1,4 @@
-﻿#if MAC
-using System;
+﻿using System;
 using Eto.Forms;
 using Krofiler.CpuSampling;
 
@@ -22,4 +21,3 @@ namespace Krofiler
 		}
 	}
 }
-#endif
