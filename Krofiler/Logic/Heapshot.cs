@@ -202,7 +202,7 @@ namespace Krofiler
 
 		static readonly Comparison<long[]> sortByLength = (x, y) => y.Length.CompareTo(x.Length);
 
-		public List<long[]> GetTop5PathsToRoots(long addr)
+		public List<long[]> GetTopPathsToRoots(long addr, int count = 10)
 		{
 			if (cachedAddr == addr && cachedResult != null)
 				return cachedResult;
@@ -211,7 +211,7 @@ namespace Krofiler
 			//if (Roots.ContainsKey(addr)) {
 			//	return cachedResult;
 			//}
-			cachedResult = SearchRoot(addr, 10);
+			cachedResult = SearchRoot(addr, count);
 			return cachedResult;
 		}
 

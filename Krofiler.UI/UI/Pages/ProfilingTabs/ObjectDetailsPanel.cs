@@ -47,7 +47,7 @@ namespace Krofiler
 			}
 
 			retentionPaths.Pages.Clear();
-			var pathsToRoot = heapshot.GetTop5PathsToRoots(objectInfo.ObjAddr);
+			var pathsToRoot = heapshot.GetTopPathsToRoots(objectInfo.ObjAddr);
 			int i = 0;
 			foreach (var path in pathsToRoot) {
 				i++;
