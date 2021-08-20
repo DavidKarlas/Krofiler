@@ -42,9 +42,13 @@ namespace Krofiler
 			};
 
 			profileApp.Executed += delegate {
-				var openFileDialog = new OpenFileDialog();
-				openFileDialog.CheckFileExists = true;
-				openFileDialog.MultiSelect = false;
+				var openFileDialog = new OpenFileDialog {
+					CheckFileExists = true,
+					MultiSelect = false,
+				};
+				var panel = ObjCRuntime.Runtime.GetNSObject<AppKit.NSOpenPanel>(openFileDialog.NativeHandle);
+				panel.TreatsFilePackagesAsDirectories = true;
+
 				//openFileDialog.Filters.Add(new FileDialogFilter(".exe application", "exe"));
 				if (DialogResult.Ok == openFileDialog.ShowDialog(this)) {
 					StartProcess(openFileDialog.FileName);
