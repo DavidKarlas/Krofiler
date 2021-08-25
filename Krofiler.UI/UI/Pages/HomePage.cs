@@ -42,17 +42,22 @@ namespace Krofiler
 			};
 
 			profileApp.Executed += delegate {
-				var openFileDialog = new OpenFileDialog {
-					CheckFileExists = true,
-					MultiSelect = false,
-				};
-				var panel = ObjCRuntime.Runtime.GetNSObject<AppKit.NSOpenPanel>(openFileDialog.NativeHandle);
+				// Eto does not support TreatFilePackagesAsDirectories
+				var panel = AppKit.NSOpenPanel.OpenPanel;
 				panel.TreatsFilePackagesAsDirectories = true;
+				panel.CanChooseDirectories = false;
+				panel.CanChooseFiles = true;
+				panel.ShowsHiddenFiles = true;
+				panel.AllowsMultipleSelection = false;
+
+				var wnd = ObjCRuntime.Runtime.GetNSObject<AppKit.NSWindow>(ParentWindow.NativeHandle);
+				panel.BeginSheet(wnd, result => {
+					if ((AppKit.NSPanelButtonType)(long)result == AppKit.NSPanelButtonType.Ok) {
+						StartProcess(panel.Url.Path);
+					}
+				}); 
 
 				//openFileDialog.Filters.Add(new FileDialogFilter(".exe application", "exe"));
-				if (DialogResult.Ok == openFileDialog.ShowDialog(this)) {
-					StartProcess(openFileDialog.FileName);
-				}
 			};
 
 			var fileMenuItems = this.ParentWindow.Menu.Items.OfType<ButtonMenuItem>().Single(i => i.Text == "&File").Items;
@@ -92,7 +97,7 @@ namespace Krofiler
 			Settings.Instance.Save();
 			StartProfiling(new StartProfilingProcessInfo() {
 				ExePath = exeName,
-				Args = ""
+				Args = "--no-redirect"
 			});
 		}
 

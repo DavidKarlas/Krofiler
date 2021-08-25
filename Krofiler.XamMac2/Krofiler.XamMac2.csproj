@@ -80,6 +80,9 @@
   <ItemGroup>
     <None Include="Info.plist" />
     <None Include="packages.config" />
+    <None Include="Entitlements.plist">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="..\Mono.Profiler.Log\Mono.Profiler.Log.projitems" Label="Shared" Condition="Exists('..\Mono.Profiler.Log\Mono.Profiler.Log.projitems')" />
   <Import Project="..\Krofiler.UI\Krofiler.UI.projitems" Label="Shared" Condition="Exists('..\Krofiler.UI\Krofiler.UI.projitems')" />

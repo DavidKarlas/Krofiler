@@ -13,19 +13,29 @@ namespace Krofiler
 
 		internal void Start(string exePath, string args, ProfileAppOptions options)
 		{
-			LogFilePath = Path.Combine(options.OutputDir, $"{Path.GetFileName(exePath)}_{DateTime.Now.ToString("yyyy-MM-dd__HH-mm-ss")}.mlpd");
+			LogFilePath = Path.Combine(options.OutputDir, $"{Path.GetFileName(exePath)}_{DateTime.Now:yyyy-MM-dd__HH-mm-ss}.mlpd");
+
 			profileProcess = new Process();
 			profileProcess.StartInfo.UseShellExecute = false;
-			var profileOptions = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=\"+{LogFilePath}\" ";
+			var profileOptions = $"--profile=log:nodefaults,heapshot-on-shutdown,heapshot=ondemand,gcalloc,gcmove,gcroot,counter,maxframes={options.MaxFrames},output=+{LogFilePath}";
 			if (exePath.EndsWith(".exe", StringComparison.Ordinal)) {
 				profileProcess.StartInfo.FileName = "/Library/Frameworks/Mono.framework/Versions/Current/bin/mono64";
 				profileProcess.StartInfo.Arguments = profileOptions;
 			} else {
 				profileProcess.StartInfo.EnvironmentVariables["MONO_ENV_OPTIONS"] = profileOptions;
-				profileProcess.StartInfo.FileName = "open";
-				profileProcess.StartInfo.Arguments = "-n ";
+
+				if (exePath.EndsWith(".app", StringComparison.Ordinal)) {
+					profileProcess.StartInfo.FileName = "open";
+					profileProcess.StartInfo.Arguments = "-n ";
+				}
 			}
-			profileProcess.StartInfo.Arguments += $"\"{exePath}\" {args}";
+
+			if (string.IsNullOrEmpty(profileProcess.StartInfo.FileName)) {
+				profileProcess.StartInfo.FileName = exePath;
+				profileProcess.StartInfo.Arguments = args;
+            } else {
+				profileProcess.StartInfo.Arguments += $"\"{exePath}\" {args}";
+			}
 			profileProcess.Start();
 			LogFilePath += "." + profileProcess.Id;
 		}
